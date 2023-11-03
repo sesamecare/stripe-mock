@@ -1,0 +1,112 @@
+package com.sesame.oss.stripemock.entities;
+
+import com.sesame.oss.stripemock.http.ResponseCodeException;
+import com.stripe.model.Customer;
+import com.stripe.model.Invoice;
+import com.stripe.model.PaymentIntent;
+import com.stripe.model.Subscription;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
+class SubscriptionManager extends AbstractEntityManager<Subscription> {
+    private final StripeEntities stripeEntities;
+
+    SubscriptionManager(Clock clock, StripeEntities stripeEntities) {
+        super(clock, Subscription.class, "sub");
+        this.stripeEntities = stripeEntities;
+    }
+
+    @Override
+    protected Subscription initialize(Subscription subscription, Map<String, Object> formData) throws ResponseCodeException {
+        if (subscription.getCustomer() == null) {
+            // todo: sync with stripe's error message
+            throw new ResponseCodeException(400, "Must provide a customer");
+        }
+        String id = subscription.getCustomer();
+        stripeEntities.getEntityManager(Customer.class)
+                      .get(id)
+                      .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, "customer", subscription.getCustomer()));
+
+        Map<String, Object> invoiceParameters = new HashMap<>();
+        invoiceParameters.put("subscription", subscription.getId());
+        invoiceParameters.put("customer", subscription.getCustomer());
+        EntityManager<Invoice> invoiceEntityManager = stripeEntities.getEntityManager(Invoice.class);
+        Invoice firstInvoice = invoiceEntityManager.add(invoiceParameters);
+        // invoices that are part of a subscription are automatically finalized, meaning that they can't change.
+        // This moves them from 'draft' to 'open'
+        firstInvoice = invoiceEntityManager.perform(firstInvoice.getId(), "finalize", new HashMap<>())
+                                           .orElseThrow();
+
+
+        // todo: should this be done automatically when creating the invoice, or can invoices be created without payment intents?
+        Map<String, Object> paymentIntentFormData = new HashMap<>();
+        paymentIntentFormData.put("amount",
+                                  subscription.getItems()
+                                              .getData()
+                                              .stream()
+                                              .mapToLong(subscriptionItem -> subscriptionItem.getPrice()
+                                                                                             .getUnitAmount())
+                                              .sum());
+        paymentIntentFormData.put("currency",
+                                  subscription.getItems()
+                                              .getData()
+                                              .stream()
+                                              .map(subscriptionItem -> subscriptionItem.getPrice()
+                                                                                       .getCurrency())
+                                              .findAny()
+                                              .orElseThrow());
+        paymentIntentFormData.put("customer", subscription.getCustomer());
+        PaymentIntent invoicePaymentIntent = stripeEntities.getEntityManager(PaymentIntent.class)
+                                                           .add(paymentIntentFormData);
+        firstInvoice.setPaymentIntent(invoicePaymentIntent.getId());
+        invoicePaymentIntent.setInvoice(firstInvoice.getId());
+
+        subscription.setStartDate(subscription.getCreated());
+        subscription.setCancelAtPeriodEnd(false);
+        subscription.setLatestInvoice(firstInvoice.getId());
+        subscription.setStatus("incomplete");
+        return super.initialize(subscription, formData);
+    }
+
+    @Override
+    public Optional<Subscription> delete(String id) throws ResponseCodeException {
+        Subscription subscription = entities.get(id);
+        if (subscription == null) {
+            return Optional.empty();
+        }
+        if (subscription.getStatus()
+                        .equals("canceled")) {
+            // todo: should we throw if we try to re-cancel?
+            return Optional.of(subscription);
+        }
+        long nowInEpochSecond = Instant.now(clock)
+                                       .getEpochSecond();
+        subscription.setCanceledAt(nowInEpochSecond);
+        subscription.setEndedAt(nowInEpochSecond);
+        subscription.setStatus("canceled");
+        return Optional.of(subscription);
+    }
+
+    @Override
+    protected Subscription parse(Map<String, Object> formData) {
+        Object items = formData.get("items");
+        if (items instanceof Map itemsStripeCollection) {
+            Object stripeCollectionData = itemsStripeCollection.get("data");
+            if (stripeCollectionData instanceof Object[] stripeCollectionDataArray) {
+                for (Object stripeCollectionDataItem : stripeCollectionDataArray) {
+                    if (stripeCollectionDataItem instanceof Map itemMap) {
+                        Object priceData = itemMap.remove("price_data");
+                        if (priceData != null) {
+                            itemMap.put("price", priceData);
+                        }
+                    }
+                }
+            }
+        }
+        return super.parse(formData);
+    }
+}
