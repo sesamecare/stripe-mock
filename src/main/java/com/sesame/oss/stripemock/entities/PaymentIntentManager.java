@@ -85,57 +85,69 @@ class PaymentIntentManager extends AbstractEntityManager<PaymentIntent> {
     @Override
     protected PaymentIntent perform(PaymentIntent existingPaymentIntent, PaymentIntent updatedPaymentIntent, String operation, Map<String, Object> formData)
             throws ResponseCodeException {
+        updatedPaymentIntent.setLastPaymentError(null);
         // We should make sure that we don't perform any changes to updatedPaymentIntent until we are sure that they will all succeed.
         // The code we have here today is a bit sloppy, and doesn't use transactions etc, but it's only a test mock, and not
         // actually a real payment platform
         String updatedPaymentIntentStatus = updatedPaymentIntent.getStatus();
         return switch (operation) {
             case "confirm" -> {
-                // todo: do pre-check state transitions as well, just like for the __update branch
-                String paymentMethodId = null;
-                if (updatedPaymentIntent.getPaymentMethod() == null) {
-                    if (updatedPaymentIntent.getCustomer() != null) {
-                        // todo: test that we throw if the customer is wrong
-                        String id = updatedPaymentIntent.getCustomer();
-                        Customer customer = stripeEntities.getEntityManager(Customer.class)
-                                                          .get(id)
-                                                          .orElseThrow(() -> ResponseCodeException.noSuchEntity(400,
-                                                                                                                "customer",
-                                                                                                                updatedPaymentIntent.getCustomer()));
-                        Customer.InvoiceSettings invoiceSettings = customer.getInvoiceSettings();
-                        if (invoiceSettings != null && invoiceSettings.getDefaultPaymentMethod() != null) {
-                            paymentMethodId = invoiceSettings.getDefaultPaymentMethod();
-                        } else if (customer.getDefaultSource() != null) {
-                            // todo: tests that use default source to pay
-                            paymentMethodId = customer.getDefaultSource();
+                try {
+                    // todo: do pre-check state transitions as well, just like for the __update branch
+                    String paymentMethodId = null;
+                    if (updatedPaymentIntent.getPaymentMethod() == null) {
+                        if (updatedPaymentIntent.getCustomer() != null) {
+                            // todo: test that we throw if the customer is wrong
+                            String id = updatedPaymentIntent.getCustomer();
+                            Customer customer = stripeEntities.getEntityManager(Customer.class)
+                                                              .get(id)
+                                                              .orElseThrow(() -> ResponseCodeException.noSuchEntity(400,
+                                                                                                                    "customer",
+                                                                                                                    updatedPaymentIntent.getCustomer()));
+                            Customer.InvoiceSettings invoiceSettings = customer.getInvoiceSettings();
+                            if (invoiceSettings != null && invoiceSettings.getDefaultPaymentMethod() != null) {
+                                paymentMethodId = invoiceSettings.getDefaultPaymentMethod();
+                            } else if (customer.getDefaultSource() != null) {
+                                // todo: tests that use default source to pay
+                                paymentMethodId = customer.getDefaultSource();
+                            }
+                        }
+                    } else {
+                        paymentMethodId = updatedPaymentIntent.getPaymentMethod();
+                    }
+                    if (paymentMethodId == null) {
+                        throw new ResponseCodeException(400,
+                                                        "You cannot confirm this PaymentIntent because it's missing a payment method. You can either update the PaymentIntent with a payment method and then confirm it again, or confirm it again directly with a payment method.");
+                    }
+                    PaymentMethodManager.throwIfPaymentMethodIsNotValid(getPaymentMethodForCustomerOrThrow(paymentMethodId,
+                                                                                                           updatedPaymentIntent.getCustomer()));
+                    // In reality this would progress to "processing" first, and then to "succeeded" when it was actually successful,
+                    // we're not going to bother with that here, since it will be immediately successful or failed
+                    updatedPaymentIntent.setStatus("succeeded");
+                    updatedPaymentIntent.setAmountReceived(updatedPaymentIntent.getAmount());
+                    if (updatedPaymentIntent.getInvoice() != null) {
+                        String invoiceId = updatedPaymentIntent.getInvoice();
+                        Invoice invoice = stripeEntities.getEntityManager(Invoice.class)
+                                                        .get(invoiceId)
+                                                        .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, "invoice", invoiceId));
+                        invoice.setStatus("paid");
+                        if (invoice.getSubscription() != null) {
+                            String subscriptionId = invoice.getSubscription();
+                            stripeEntities.getEntityManager(Subscription.class)
+                                          .get(subscriptionId)
+                                          .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, "subscription", subscriptionId))
+                                          .setStatus("active");
                         }
                     }
-                } else {
-                    paymentMethodId = updatedPaymentIntent.getPaymentMethod();
-                }
-                if (paymentMethodId == null) {
-                    throw new ResponseCodeException(400,
-                                                    "You cannot confirm this PaymentIntent because it's missing a payment method. You can either update the PaymentIntent with a payment method and then confirm it again, or confirm it again directly with a payment method.");
-                }
-
-                PaymentMethodManager.throwIfPaymentMethodIsNotValid(getPaymentMethodForCustomerOrThrow(paymentMethodId, updatedPaymentIntent.getCustomer()));
-                // In reality this would progress to "processing" first, and then to "succeeded" when it was actually successful,
-                // we're not going to bother with that here, since it will be immediately successful or failed
-                updatedPaymentIntent.setStatus("succeeded");
-                updatedPaymentIntent.setAmountReceived(updatedPaymentIntent.getAmount());
-                if (updatedPaymentIntent.getInvoice() != null) {
-                    String invoiceId = updatedPaymentIntent.getInvoice();
-                    Invoice invoice = stripeEntities.getEntityManager(Invoice.class)
-                                                    .get(invoiceId)
-                                                    .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, "invoice", invoiceId));
-                    invoice.setStatus("paid");
-                    if (invoice.getSubscription() != null) {
-                        String subscriptionId = invoice.getSubscription();
-                        stripeEntities.getEntityManager(Subscription.class)
-                                      .get(subscriptionId)
-                                      .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, "subscription", subscriptionId))
-                                      .setStatus("active");
-                    }
+                } catch (ResponseCodeException e) {
+                    StripeError lastPaymentError = new StripeError();
+                    lastPaymentError.setCode(e.getCode());
+                    lastPaymentError.setDeclineCode(e.getDeclineCode());
+                    lastPaymentError.setType(e.getErrorType());
+                    lastPaymentError.setMessage(e.getMessage());
+                    // We have to set this on the *existing* payment intent, as the *updated* payment intent is discarded when we throw this exception
+                    existingPaymentIntent.setLastPaymentError(lastPaymentError);
+                    throw e;
                 }
                 yield updatedPaymentIntent;
             }

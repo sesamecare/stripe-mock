@@ -1,5 +1,6 @@
 package com.sesame.oss.stripemock.entities;
 
+import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.sesame.oss.stripemock.StripeMock;
 import com.sesame.oss.stripemock.http.QueryParameters;
@@ -194,6 +195,7 @@ abstract class AbstractEntityManager<T extends ApiResource & HasId> implements E
                 merge(child, m);
             } else {
                 switch (value) {
+                    case null -> parent.add(name, JsonNull.INSTANCE);
                     case Number n -> parent.addProperty(name, n);
                     case String s -> parent.addProperty(name, s);
                     case Boolean b -> parent.addProperty(name, b);

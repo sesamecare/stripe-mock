@@ -25,7 +25,7 @@ public class StripeEntities {
         add(new RefundManager(clock, this));
         add(new SetupIntentManager(clock));
         add(new TransferManager(clock));
-        add(new CustomerManager(clock));
+        add(new CustomerManager(clock, this));
         add(new InvoiceManager(clock));
         add(new ProductManager(clock));
         add(new AccountManager(clock));

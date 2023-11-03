@@ -5,6 +5,7 @@ import com.stripe.exception.StripeException;
 import com.stripe.model.Customer;
 import com.stripe.model.PaymentIntent;
 import com.stripe.model.PaymentMethod;
+import com.stripe.model.StripeError;
 import com.stripe.net.RequestOptions;
 import com.stripe.param.*;
 import com.stripe.param.PaymentIntentUpdateParams.SetupFutureUsage;
@@ -114,6 +115,13 @@ public class PaymentIntentTest extends AbstractStripeMockTest {
                 "No such PaymentMethod: 'pm_nope'; It's possible this PaymentMethod exists on one of your connected accounts, in which case you should retry this request on that connected account. Learn more at https://stripe.com/docs/connect/authentication",
                 wrongPaymentMethod.getStripeError()
                                   .getMessage());
+        StripeError lastPaymentError = PaymentIntent.retrieve(createdPaymentIntent.getId())
+                                                    .getLastPaymentError();
+        assertNotNull(lastPaymentError);
+        assertEquals(
+                "No such PaymentMethod: 'pm_nope'; It's possible this PaymentMethod exists on one of your connected accounts, in which case you should retry this request on that connected account. Learn more at https://stripe.com/docs/connect/authentication",
+                lastPaymentError.getMessage());
+
         PaymentIntent confirmedPaymentIntent = createdPaymentIntent.confirm(PaymentIntentConfirmParams.builder()
                                                                                                       .setPaymentMethod("pm_card_visa")
                                                                                                       .setCaptureMethod(PaymentIntentConfirmParams.CaptureMethod.AUTOMATIC)

@@ -67,6 +67,9 @@ public class PaymentMethodTest extends AbstractStripeMockTest {
     }
 
     // todo: test without a customer: In order to share a PaymentMethod, you must pass a connected account ID by using an OAuth key or the Stripe-Account header.
+    // This happens if you try to do this:
+    // PaymentMethod.create(PaymentMethodCreateParams.builder().setPaymentMethod("tok_amex").build())
+
     // todo: test: com.stripe.exception.InvalidRequestException: You cannot attach a PaymentMethod to a Customer during PaymentMethod creation. Please instead create the PaymentMethod and then attach it using the attachment method of the PaymentMethods API.
 
 

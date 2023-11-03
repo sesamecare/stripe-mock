@@ -1,12 +1,17 @@
 package com.sesame.oss.stripemock;
 
 import com.stripe.exception.IdempotencyException;
+import com.stripe.exception.InvalidRequestException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Customer;
+import com.stripe.model.PaymentMethod;
 import com.stripe.net.RequestOptions;
 import com.stripe.param.CustomerCreateParams;
 import com.stripe.param.CustomerUpdateParams;
 import com.stripe.param.CustomerUpdateParams.Address;
+import com.stripe.param.PaymentMethodAttachParams;
+import com.stripe.param.PaymentMethodCreateParams;
+import com.stripe.param.common.EmptyParam;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
@@ -57,9 +62,8 @@ public class CustomerTest extends AbstractStripeMockTest {
                                                                        .putMetadata("integration_test", "true")
                                                                        .setName("Mike Smith")
                                                                        .build());
-        assertEquals("",
-                     createdCustomer.getMetadata()
-                                    .get("entity_type"));
+        assertNull(createdCustomer.getMetadata()
+                                  .get("entity_type"));
     }
 
     /**
@@ -152,5 +156,77 @@ public class CustomerTest extends AbstractStripeMockTest {
 
         Customer retrievedCustomer = Customer.retrieve(customer.getId());
         assertEquals(updatedCustomer, retrievedCustomer);
+    }
+
+    @Test
+    void shouldNotBeAbleToUnsetDefaultSource() throws StripeException {
+        Customer customer = Customer.create(CustomerCreateParams.builder()
+                                                                .setName("Mike Smith")
+                                                                .setSource("tok_amex")
+                                                                .build());
+        InvalidRequestException cannotUnsetDefaultSource = assertThrows(InvalidRequestException.class,
+                                                                        () -> customer.update(CustomerUpdateParams.builder()
+                                                                                                                  .setDefaultSource(EmptyParam.EMPTY)
+                                                                                                                  .build()));
+        System.out.println("cannotUnsetDefaultSource = " + cannotUnsetDefaultSource.getStripeError());
+        assertEquals(
+                "You passed an empty string for 'default_source'. We assume empty values are an attempt to unset a parameter; however 'default_source' cannot be unset. You should remove 'default_source' from your request or supply a non-empty value.",
+                cannotUnsetDefaultSource.getStripeError()
+                                        .getMessage());
+        assertEquals("parameter_invalid_empty",
+                     cannotUnsetDefaultSource.getStripeError()
+                                             .getCode());
+        assertNull(cannotUnsetDefaultSource.getStripeError()
+                                           .getType());
+
+    }
+
+    @Test
+    void shouldNotSetDefaultPaymentMethodAtCustomerCreation() {
+        InvalidRequestException noSuchPaymentMethod = assertThrows(InvalidRequestException.class,
+                                                                   () -> Customer.create(CustomerCreateParams.builder()
+                                                                                                             .setName("Mike Smith")
+                                                                                                             .setInvoiceSettings(CustomerCreateParams.InvoiceSettings.builder()
+                                                                                                                                                                     .setDefaultPaymentMethod(
+                                                                                                                                                                             "tok_mastercard")
+                                                                                                                                                                     .build())
+                                                                                                             .build()));
+        assertEquals(
+                "No such PaymentMethod: 'tok_mastercard'; It's possible this PaymentMethod exists on one of your connected accounts, in which case you should retry this request on that connected account. Learn more at https://stripe.com/docs/connect/authentication",
+                noSuchPaymentMethod.getStripeError()
+                                   .getMessage());
+        assertEquals("resource_missing",
+                     noSuchPaymentMethod.getStripeError()
+                                        .getCode());
+        assertEquals("invalid_request_error",
+                     noSuchPaymentMethod.getStripeError()
+                                        .getType());
+    }
+
+    @Test
+    void shouldUnsetDefaultPaymentMethod() throws StripeException {
+        Customer customer = Customer.create(CustomerCreateParams.builder()
+                                                                .setName("Mike Smith")
+                                                                .build());
+        PaymentMethod.create(PaymentMethodCreateParams.builder()
+                                                      .setType(PaymentMethodCreateParams.Type.CARD)
+                                                      .setCard(PaymentMethodCreateParams.Token.builder()
+                                                                                              .setToken("tok_mastercard")
+                                                                                              .build())
+                                                      .build())
+                     .attach(PaymentMethodAttachParams.builder()
+                                                      .setCustomer(customer.getId())
+                                                      .build());
+        Customer updatedCustomer = customer.update(CustomerUpdateParams.builder()
+                                                                       .setInvoiceSettings(CustomerUpdateParams.InvoiceSettings.builder()
+                                                                                                                               .setDefaultPaymentMethod(
+                                                                                                                                       EmptyParam.EMPTY)
+                                                                                                                               .build())
+                                                                       .build());
+        assertNull(updatedCustomer.getInvoiceSettings()
+                                  .getDefaultPaymentMethod());
+        assertNull(Customer.retrieve(customer.getId())
+                           .getInvoiceSettings()
+                           .getDefaultPaymentMethod());
     }
 }

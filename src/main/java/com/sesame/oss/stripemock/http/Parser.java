@@ -5,7 +5,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.OptionalInt;
-import java.util.stream.Collectors;
 
 public class Parser {
     Map<String, Object> parseRequestBody(String requestBody, String contentType) throws ResponseCodeException {
@@ -31,8 +30,9 @@ public class Parser {
             String key = parameterParts[0];
             String value;
             if (parameterParts.length == 1) {
-                // This happens for calls to putMetadata("value", null), which we must support
-                value = "";
+                // This happens for calls to putMetadata("value", null), which we must support.
+                // This also happens when someone passes an EmptyParam in, to unset a value
+                value = null;
             } else {
                 value = parameterParts[1];
             }
@@ -61,62 +61,65 @@ public class Parser {
      * It's easier to do it on the existing map, rather than as we're creating the map, as we don't have to look forward to the next token
      */
     private Map<String, Object> convertIndexedMapsToArrays(Map<String, Object> input) {
-        return input.entrySet()
-                    .stream()
-                    .map(entry -> {
-                        String key = entry.getKey();
-                        Object value = entry.getValue();
-                        Object newValue;
-                        if (value instanceof Map valueAsUntypedMap) {
-                            Map<String, Object> valueMap = valueAsUntypedMap;
-                            // if the first key is a number, we're going to assume that they all are, and that this is supposed to be a list
-                            OptionalInt maxIndex = valueMap.keySet()
-                                                           .stream()
-                                                           .mapToInt(potentialIntegerKey -> {
-                                                               try {
-                                                                   return Integer.parseInt(potentialIntegerKey);
-                                                               } catch (NumberFormatException e) {
-                                                                   return -1;
-                                                               }
-                                                           })
-                                                           .max();
-                            if (maxIndex.isPresent() && maxIndex.getAsInt() > -1) {
-                                Object[] stripeCollectionData = new Object[maxIndex.getAsInt() + 1];
-                                // We know all entries are ints if we enter this block
-                                for (Map.Entry<String, Object> intEntry : valueMap.entrySet()) {
-                                    stripeCollectionData[Integer.parseInt(intEntry.getKey())] = switch (intEntry.getValue()) {
-                                        case Map arrayItemMap -> convertIndexedMapsToArrays(arrayItemMap);
-                                        case Object o -> o;
-                                    };
-                                }
+        // if the first key is a number, we're going to assume that they all are, and that this is supposed to be a list
+        // We know all entries are ints if we enter this block
+        // Lists of primitives should just be an array, but list of complex objects should be a stripe collection
+        // We assume that if one's a map, the other ones are too
+        Map<String, Object> output = new HashMap<>();
+        for (Map.Entry<String, Object> inputEntry : input.entrySet()) {
+            String key = inputEntry.getKey();
+            Object value = inputEntry.getValue();
+            Object newValue;
+            if (value instanceof Map valueAsUntypedMap) {
+                Map<String, Object> valueMap = valueAsUntypedMap;
+                // if the first key is a number, we're going to assume that they all are, and that this is supposed to be a list
+                OptionalInt maxIndex = valueMap.keySet()
+                                               .stream()
+                                               .mapToInt(potentialIntegerKey -> {
+                                                   try {
+                                                       return Integer.parseInt(potentialIntegerKey);
+                                                   } catch (NumberFormatException e) {
+                                                       return -1;
+                                                   }
+                                               })
+                                               .max();
+                if (maxIndex.isPresent() && maxIndex.getAsInt() > -1) {
+                    Object[] stripeCollectionData = new Object[maxIndex.getAsInt() + 1];
+                    // We know all entries are ints if we enter this block
+                    for (Map.Entry<String, Object> intEntry : valueMap.entrySet()) {
+                        stripeCollectionData[Integer.parseInt(intEntry.getKey())] = switch (intEntry.getValue()) {
+                            case Map arrayItemMap -> convertIndexedMapsToArrays(arrayItemMap);
+                            case Object o -> o;
+                        };
+                    }
 
 
-                                // Lists of primitives should just be an array, but list of complex objects should be a stripe collection
-                                // We assume that if one's a map, the other ones are too
-                                if (stripeCollectionData[0] instanceof Map) {
-                                    Map<String, Object> stripeCollection = new HashMap<>();
-                                    stripeCollection.put("object", "list");
-                                    stripeCollection.put("data", stripeCollectionData);
-                                    newValue = stripeCollection;
-                                } else {
-                                    newValue = stripeCollectionData;
-                                }
+                    // Lists of primitives should just be an array, but list of complex objects should be a stripe collection
+                    // We assume that if one's a map, the other ones are too
+                    if (stripeCollectionData[0] instanceof Map) {
+                        Map<String, Object> stripeCollection = new HashMap<>();
+                        stripeCollection.put("object", "list");
+                        stripeCollection.put("data", stripeCollectionData);
+                        newValue = stripeCollection;
+                    } else {
+                        newValue = stripeCollectionData;
+                    }
 
-                            } else {
-                                newValue = convertIndexedMapsToArrays(valueMap);
-                            }
-                        } else {
-                            newValue = value;
-                        }
-                        return Map.entry(key, newValue);
-                    })
-                    .collect(Collectors.toMap(Map.Entry::getKey,
-                                              Map.Entry::getValue,
-                                              (a, b) -> {throw new IllegalStateException("There should be no duplicates");},
-                                              HashMap::new));
+                } else {
+                    newValue = convertIndexedMapsToArrays(valueMap);
+                }
+            } else {
+                newValue = value;
+            }
+            output.put(key, newValue);
+        }
+        return output;
     }
 
     private Object toJsonParseableType(String value) {
+        if (value == null) {
+            return null;
+        }
         // It turns out that gson is smart enough to handle the case when everything is a string, so we don't need to do any actual type conversion here
         return URLDecoder.decode(value, StandardCharsets.UTF_8);
     }
