@@ -22,7 +22,7 @@ public class CustomerTest extends AbstractStripeMockTest {
     @Test
     void shouldGetTheSameResponseForIdempotentRequests() throws StripeException {
         CustomerCreateParams input = CustomerCreateParams.builder()
-                                                         .setName("Mike Smith")
+                                                         .setName("stripe-mock test")
                                                          .build();
         RequestOptions options = RequestOptions.builder()
                                                .setIdempotencyKey(String.valueOf(Math.random()))
@@ -36,7 +36,7 @@ public class CustomerTest extends AbstractStripeMockTest {
     void shouldNotBeAbleToCreateDifferentEntitiesUsingTheSameIdempotencyKey() throws StripeException {
         String idempotencyKey = String.valueOf(Math.random());
         Customer.create(CustomerCreateParams.builder()
-                                            .setName("Mike Smith")
+                                            .setName("stripe-mock test")
                                             .build(),
                         RequestOptions.builder()
                                       .setIdempotencyKey(idempotencyKey)
@@ -60,31 +60,19 @@ public class CustomerTest extends AbstractStripeMockTest {
         Customer createdCustomer = Customer.create(CustomerCreateParams.builder()
                                                                        .putMetadata("entity_type", null)
                                                                        .putMetadata("integration_test", "true")
-                                                                       .setName("Mike Smith")
+                                                                       .setName("stripe-mock test")
                                                                        .build());
         assertNull(createdCustomer.getMetadata()
                                   .get("entity_type"));
     }
 
-    /**
-     * todo: We should have this test for each entity, just like for the idempotency
-     */
-    @Test
-    void shouldSupportOverridingTheId() throws StripeException {
-        Customer createdCustomer = Customer.create(CustomerCreateParams.builder()
-                                                                       .putMetadata(StripeMock.OVERRIDE_ID_FOR_TESTING, "cus_abc123")
-                                                                       .putMetadata("integration_test", "true")
-                                                                       .setName("Mike Smith")
-                                                                       .build());
-        assertEquals("cus_abc123", createdCustomer.getId());
-    }
 
     @Test
     void testCustomer() throws Exception {
         Customer createdCustomer = Customer.create(CustomerCreateParams.builder()
                                                                        .setPhone("0000")
                                                                        .putMetadata("integration_test", "true")
-                                                                       .setName("Mike Smith")
+                                                                       .setName("stripe-mock test")
                                                                        .setBalance(100_000_00L)
                                                                        .setValidate(false)
                                                                        .setAddress(CustomerCreateParams.Address.builder()
@@ -93,7 +81,7 @@ public class CustomerTest extends AbstractStripeMockTest {
                                                                                                                .build())
                                                                        .build());
         assertEquals("0000", createdCustomer.getPhone());
-        assertEquals("Mike Smith", createdCustomer.getName());
+        assertEquals("stripe-mock test", createdCustomer.getName());
         assertEquals("Stockholm",
                      createdCustomer.getAddress()
                                     .getCity());
@@ -122,7 +110,7 @@ public class CustomerTest extends AbstractStripeMockTest {
     @Test
     void shouldDeleteCustomer() throws StripeException {
         Customer createdCustomer = Customer.create(CustomerCreateParams.builder()
-                                                                       .setName("Mike Smith")
+                                                                       .setName("stripe-mock test")
                                                                        .build());
         Customer retrievedCustomer1 = Customer.retrieve(createdCustomer.getId());
         assertEquals(createdCustomer.getId(), retrievedCustomer1.getId());
@@ -137,7 +125,7 @@ public class CustomerTest extends AbstractStripeMockTest {
     @Test
     void shouldAlwaysGetNonNullMetadata() throws StripeException {
         Customer createdCustomer = Customer.create(CustomerCreateParams.builder()
-                                                                       .setName("Mike Smith")
+                                                                       .setName("stripe-mock test")
                                                                        .build());
         assertEquals(Collections.emptyMap(), createdCustomer.getMetadata());
     }
@@ -145,7 +133,7 @@ public class CustomerTest extends AbstractStripeMockTest {
     @Test
     void shouldSetDefaultSource() throws StripeException {
         Customer customer = Customer.create(CustomerCreateParams.builder()
-                                                                .setName("Mike Smith")
+                                                                .setName("stripe-mock test")
                                                                 .build());
         Customer updatedCustomer = customer.update(CustomerUpdateParams.builder()
                                                                        .setSource("tok_amex")
@@ -161,14 +149,13 @@ public class CustomerTest extends AbstractStripeMockTest {
     @Test
     void shouldNotBeAbleToUnsetDefaultSource() throws StripeException {
         Customer customer = Customer.create(CustomerCreateParams.builder()
-                                                                .setName("Mike Smith")
+                                                                .setName("stripe-mock test")
                                                                 .setSource("tok_amex")
                                                                 .build());
         InvalidRequestException cannotUnsetDefaultSource = assertThrows(InvalidRequestException.class,
                                                                         () -> customer.update(CustomerUpdateParams.builder()
                                                                                                                   .setDefaultSource(EmptyParam.EMPTY)
                                                                                                                   .build()));
-        System.out.println("cannotUnsetDefaultSource = " + cannotUnsetDefaultSource.getStripeError());
         assertEquals(
                 "You passed an empty string for 'default_source'. We assume empty values are an attempt to unset a parameter; however 'default_source' cannot be unset. You should remove 'default_source' from your request or supply a non-empty value.",
                 cannotUnsetDefaultSource.getStripeError()
@@ -176,8 +163,9 @@ public class CustomerTest extends AbstractStripeMockTest {
         assertEquals("parameter_invalid_empty",
                      cannotUnsetDefaultSource.getStripeError()
                                              .getCode());
-        assertNull(cannotUnsetDefaultSource.getStripeError()
-                                           .getType());
+        assertEquals("invalid_request_error",
+                     cannotUnsetDefaultSource.getStripeError()
+                                             .getType());
 
     }
 
@@ -185,7 +173,7 @@ public class CustomerTest extends AbstractStripeMockTest {
     void shouldNotSetDefaultPaymentMethodAtCustomerCreation() {
         InvalidRequestException noSuchPaymentMethod = assertThrows(InvalidRequestException.class,
                                                                    () -> Customer.create(CustomerCreateParams.builder()
-                                                                                                             .setName("Mike Smith")
+                                                                                                             .setName("stripe-mock test")
                                                                                                              .setInvoiceSettings(CustomerCreateParams.InvoiceSettings.builder()
                                                                                                                                                                      .setDefaultPaymentMethod(
                                                                                                                                                                              "tok_mastercard")
@@ -206,7 +194,7 @@ public class CustomerTest extends AbstractStripeMockTest {
     @Test
     void shouldUnsetDefaultPaymentMethod() throws StripeException {
         Customer customer = Customer.create(CustomerCreateParams.builder()
-                                                                .setName("Mike Smith")
+                                                                .setName("stripe-mock test")
                                                                 .build());
         PaymentMethod.create(PaymentMethodCreateParams.builder()
                                                       .setType(PaymentMethodCreateParams.Type.CARD)

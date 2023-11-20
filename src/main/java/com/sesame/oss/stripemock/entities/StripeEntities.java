@@ -12,32 +12,42 @@ import java.util.Optional;
 
 public class StripeEntities {
     private final Map<Class<? extends ApiResource>, EntityManager<? extends ApiResource>> entityManagers = new HashMap<>();
+    private final Map<String, EntityManager<? extends ApiResource>> entityManagersByNormalizedEntityName = new HashMap<>();
 
     public StripeEntities(Clock clock) {
         // As these entity managers will need to have access to each other, often in a circular dependency fashion,
         // we're passing in the StripeEntities so they can do resolution using it. This means that we're leaking 'this'
         // before the object is constructed, but it still seems more elegant than calling a setter on each manager later.
 
-
+        add(new TransferReversalManager(clock, this));
         add(new PaymentMethodManager(clock, this));
         add(new PaymentIntentManager(clock, this));
         add(new SubscriptionManager(clock, this));
         add(new RefundManager(clock, this));
         add(new SetupIntentManager(clock));
-        add(new TransferManager(clock));
+        add(new TransferManager(clock, this));
         add(new CustomerManager(clock, this));
-        add(new InvoiceManager(clock));
+        add(new InvoiceManager(clock, this));
         add(new ProductManager(clock));
         add(new AccountManager(clock));
     }
 
     private void add(EntityManager<?> entityManager) {
         entityManagers.put(entityManager.getEntityClass(), entityManager);
+        entityManagersByNormalizedEntityName.put(entityManager.getNormalizedEntityName(), entityManager);
         entityManager.bootstrap();
     }
 
     public <T extends ApiResource & HasId> EntityManager<T> getEntityManager(Class<T> entityClass) {
         return (EntityManager<T>) entityManagers.get(entityClass);
+    }
+
+    /**
+     * @param normalizedEntityName {@code payment_intents} for {@link com.stripe.model.PaymentIntent} for example. It's whatever the URL path would be start with.
+     * @see EntityManager#getNormalizedEntityName()
+     */
+    public EntityManager<?> getEntityManager(String normalizedEntityName) {
+        return entityManagersByNormalizedEntityName.get(normalizedEntityName);
     }
 
     public void clear() {

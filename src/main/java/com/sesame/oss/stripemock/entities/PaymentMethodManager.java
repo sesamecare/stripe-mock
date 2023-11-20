@@ -14,35 +14,12 @@ import java.util.Map;
 import java.util.Set;
 
 class PaymentMethodManager extends AbstractEntityManager<PaymentMethod> {
-    // todo. also the tokens and payment methods per country: https://stripe.com/docs/testing?testing-method=payment-methods
-    static final Set<String> TEST_PAYMENT_METHODS = Set.of("pm_card_visa",
-                                                           "pm_card_visa_debit",
-                                                           "pm_card_mastercard",
-                                                           "pm_card_mastercard_debit",
-                                                           "pm_card_mastercard_prepaid",
-                                                           "pm_card_amex",
-                                                           "pm_card_discover",
-                                                           "pm_card_diners",
-                                                           "pm_card_jcb",
-                                                           "pm_card_unionpay");
-
-    static final Set<String> TEST_PAYMENT_TOKENS = Set.of("tok_visa",
-                                                          "tok_visa_debit",
-                                                          "tok_mastercard",
-                                                          "tok_mastercard_debit",
-                                                          "tok_mastercard_prepaid",
-                                                          "tok_amex",
-                                                          "tok_discover",
-                                                          "tok_diners",
-                                                          "tok_jcb",
-                                                          "tok_unionpay");
-
     // todo: test methods for things like charge_declined etc
 
     private final StripeEntities stripeEntities;
 
     PaymentMethodManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, PaymentMethod.class, "pm");
+        super(clock, PaymentMethod.class, "pm", 24);
         this.stripeEntities = stripeEntities;
     }
 
@@ -52,6 +29,8 @@ class PaymentMethodManager extends AbstractEntityManager<PaymentMethod> {
             // todo: more
             bootstrapTestCard("tok_chargeCustomerFail", "pm_card_chargeCustomerFail");
             bootstrapTestCard("tok_chargeCustomerFail", "tok_chargeCustomerFail");
+            bootstrapTestCard("tok_visa_chargeDeclined", "pm_card_visa_chargeDeclined");
+            bootstrapTestCard("tok_visa_chargeDeclined", "tok_visa_chargeDeclined");
             bootstrapTestCard("tok_mastercard", "pm_card_mastercard");
             bootstrapTestCard("tok_mastercard", "tok_mastercard");
             bootstrapTestCard("tok_visa", "pm_card_visa");
@@ -112,6 +91,14 @@ class PaymentMethodManager extends AbstractEntityManager<PaymentMethod> {
                     card.setLast4("0341");
                     card.setExpMonth((long) today.getMonthValue());
                     card.setExpYear((long) (today.getYear() + 1));
+                } else if ("tok_visa_chargeDeclined".equals(token)) {
+                    // todo: disallow this from being attached to a customer
+                    card.setBrand("visa");
+                    card.setCountry("US");
+                    card.setFunding("credit");
+                    card.setLast4("0002");
+                    card.setExpMonth((long) today.getMonthValue());
+                    card.setExpYear((long) (today.getYear() + 1));
                 } else {
                     // todo: Support more payment methods later
                     throw new ResponseCodeException(400, "Unknown payment token: " + token);
@@ -123,33 +110,31 @@ class PaymentMethodManager extends AbstractEntityManager<PaymentMethod> {
     }
 
     @Override
+    protected void validate(PaymentMethod paymentMethod) throws ResponseCodeException {
+        String customerId = paymentMethod.getCustomer();
+        if (customerId != null) {
+            stripeEntities.getEntityManager(Customer.class)
+                          .get(customerId)
+                          .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, "customer", customerId));
+        }
+    }
+
+    @Override
     protected PaymentMethod perform(PaymentMethod existingPaymentMethod, PaymentMethod updatedPaymentMethod, String operation, Map<String, Object> formData)
             throws ResponseCodeException {
         if ("attach".equals(operation)) {
-            String customerId = updatedPaymentMethod.getCustomer();
-            if (customerId == null) {
-                // todo: align with stripe error message
-                throw new ResponseCodeException(400, "Most provide a customer");
-            }
-            // todo: assert that we throw if the customer can't be found
-            Customer customer = stripeEntities.getEntityManager(Customer.class)
-                                              .get(customerId)
-                                              .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, "customer", customerId));
-            Customer.InvoiceSettings invoiceSettings = customer.getInvoiceSettings();
-            if (invoiceSettings == null) {
-                invoiceSettings = new Customer.InvoiceSettings();
-                customer.setInvoiceSettings(invoiceSettings);
-            }
-            if (invoiceSettings.getDefaultPaymentMethod() == null) {
-                invoiceSettings.setDefaultPaymentMethod(updatedPaymentMethod.getId());
-            }
-            updatedPaymentMethod.setCustomer(customerId);
+            updatedPaymentMethod.setCustomer(updatedPaymentMethod.getCustomer());
             return updatedPaymentMethod;
         } else if ("detach".equals(operation)) {
             updatedPaymentMethod.setCustomer(null);
             return updatedPaymentMethod;
         }
         return super.perform(existingPaymentMethod, updatedPaymentMethod, operation, formData);
+    }
+
+    @Override
+    public boolean canPerformOperation(String operation) {
+        return operation.equals("attach") || operation.equals("detach");
     }
 
     @Override
@@ -176,7 +161,7 @@ class PaymentMethodManager extends AbstractEntityManager<PaymentMethod> {
                 }
             }
             case "visa" -> {
-                if (last4.equals("0341")) {
+                if (last4.equals("0341") || last4.equals("0002")) {
                     throw new ResponseCodeException(402, "Your card was declined.", "card_declined", null, "generic_decline");
                 }
                 if (!last4.equals("4242")) {

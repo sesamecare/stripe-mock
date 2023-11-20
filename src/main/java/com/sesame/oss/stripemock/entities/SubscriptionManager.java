@@ -16,15 +16,14 @@ class SubscriptionManager extends AbstractEntityManager<Subscription> {
     private final StripeEntities stripeEntities;
 
     SubscriptionManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, Subscription.class, "sub");
+        super(clock, Subscription.class, "sub", 24);
         this.stripeEntities = stripeEntities;
     }
 
     @Override
     protected Subscription initialize(Subscription subscription, Map<String, Object> formData) throws ResponseCodeException {
         if (subscription.getCustomer() == null) {
-            // todo: sync with stripe's error message
-            throw new ResponseCodeException(400, "Must provide a customer");
+            throw new ResponseCodeException(400, "Missing required param: customer.");
         }
         String id = subscription.getCustomer();
         stripeEntities.getEntityManager(Customer.class)

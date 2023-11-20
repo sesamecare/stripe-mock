@@ -13,7 +13,7 @@ class PaymentIntentManager extends AbstractEntityManager<PaymentIntent> {
     private final StripeEntities stripeEntities;
 
     PaymentIntentManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, PaymentIntent.class, "pi");
+        super(clock, PaymentIntent.class, "pi", 24);
         this.stripeEntities = stripeEntities;
     }
 
@@ -61,7 +61,7 @@ class PaymentIntentManager extends AbstractEntityManager<PaymentIntent> {
             getPaymentMethodForCustomerOrThrow(paymentMethodId, customer);
         }
         if (paymentIntent.getAmount() == null) {
-            throw new ResponseCodeException(400, "Must provide 'amount'");
+            throw new ResponseCodeException(400, "Missing required param: amount.");
         }
         if (paymentIntent.getCurrency() == null) {
             throw new ResponseCodeException(400, "Missing required param: currency.");
@@ -105,11 +105,20 @@ class PaymentIntentManager extends AbstractEntityManager<PaymentIntent> {
                                                                                                                     "customer",
                                                                                                                     updatedPaymentIntent.getCustomer()));
                             Customer.InvoiceSettings invoiceSettings = customer.getInvoiceSettings();
-                            if (invoiceSettings != null && invoiceSettings.getDefaultPaymentMethod() != null) {
+                            if (invoiceSettings != null && invoiceSettings.getDefaultPaymentMethod() != null && updatedPaymentIntent.getInvoice() != null) {
+                                // This is only valid for invoices
                                 paymentMethodId = invoiceSettings.getDefaultPaymentMethod();
                             } else if (customer.getDefaultSource() != null) {
                                 // todo: tests that use default source to pay
                                 paymentMethodId = customer.getDefaultSource();
+                            } else {
+                                throw new ResponseCodeException(400,
+                                                                String.format(
+                                                                        "You cannot confirm this PaymentIntent because it's missing a payment method. To confirm the PaymentIntent with %s, specify a payment method attached to this customer along with the customer ID.",
+                                                                        customer.getId()),
+                                                                "payment_intent_unexpected_state",
+                                                                null,
+                                                                null);
                             }
                         }
                     } else {
@@ -145,6 +154,8 @@ class PaymentIntentManager extends AbstractEntityManager<PaymentIntent> {
                     lastPaymentError.setDeclineCode(e.getDeclineCode());
                     lastPaymentError.setType(e.getErrorType());
                     lastPaymentError.setMessage(e.getMessage());
+                    // todo: set the payment method (this would cause a circular dependency, so we can't really do that here.)
+                    // todo: docUrl for card_declined: https://stripe.com/docs/error-codes/card-declined
                     // We have to set this on the *existing* payment intent, as the *updated* payment intent is discarded when we throw this exception
                     existingPaymentIntent.setLastPaymentError(lastPaymentError);
                     throw e;
@@ -184,5 +195,10 @@ class PaymentIntentManager extends AbstractEntityManager<PaymentIntent> {
             }
             default -> super.perform(existingPaymentIntent, updatedPaymentIntent, operation, formData);
         };
+    }
+
+    @Override
+    public boolean canPerformOperation(String operation) {
+        return operation.equals("confirm") || operation.equals("cancel") || operation.equals("apply_customer_balance");
     }
 }

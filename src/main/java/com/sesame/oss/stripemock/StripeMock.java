@@ -5,7 +5,6 @@ import com.sesame.oss.stripemock.http.StripeApiHttpHandler;
 import com.sesame.oss.stripemock.util.MutableClock;
 import com.stripe.Stripe;
 import com.stripe.exception.StripeException;
-import com.stripe.model.*;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
@@ -21,11 +20,11 @@ public class StripeMock {
      * transition from real stripe tests to mocked stripe tests.
      */
     public static final String OVERRIDE_ID_FOR_TESTING = "__override_id_for_testing";
-    private final MutableClock clock = new MutableClock(Clock.systemDefaultZone()
-                                                             .getZone(),
-                                                        Clock.systemDefaultZone()
-                                                             .instant());
-    private final StripeEntities stripeEntities = new StripeEntities(clock);
+    private static final MutableClock CLOCK = new MutableClock(Clock.systemDefaultZone()
+                                                                    .getZone(),
+                                                               Clock.systemDefaultZone()
+                                                                    .instant());
+    private final StripeEntities stripeEntities = new StripeEntities(CLOCK);
     private final HttpServer httpServer;
 
     /**
@@ -46,16 +45,7 @@ public class StripeMock {
 
     private StripeMock(int port) throws IOException {
         httpServer = HttpServer.create(new InetSocketAddress("localhost", port), 50);
-        httpServer.createContext("/v1/payment_methods", new StripeApiHttpHandler<>(stripeEntities.getEntityManager(PaymentMethod.class), stripeEntities));
-        httpServer.createContext("/v1/payment_intents", new StripeApiHttpHandler<>(stripeEntities.getEntityManager(PaymentIntent.class), stripeEntities));
-        httpServer.createContext("/v1/subscriptions", new StripeApiHttpHandler<>(stripeEntities.getEntityManager(Subscription.class), stripeEntities));
-        httpServer.createContext("/v1/setup_intents", new StripeApiHttpHandler<>(stripeEntities.getEntityManager(SetupIntent.class), stripeEntities));
-        httpServer.createContext("/v1/customers", new StripeApiHttpHandler<>(stripeEntities.getEntityManager(Customer.class), stripeEntities));
-        httpServer.createContext("/v1/transfers", new StripeApiHttpHandler<>(stripeEntities.getEntityManager(Transfer.class), stripeEntities));
-        httpServer.createContext("/v1/invoices", new StripeApiHttpHandler<>(stripeEntities.getEntityManager(Invoice.class), stripeEntities));
-        httpServer.createContext("/v1/products", new StripeApiHttpHandler<>(stripeEntities.getEntityManager(Product.class), stripeEntities));
-        httpServer.createContext("/v1/accounts", new StripeApiHttpHandler<>(stripeEntities.getEntityManager(Account.class), stripeEntities));
-        httpServer.createContext("/v1/refunds", new StripeApiHttpHandler<>(stripeEntities.getEntityManager(Refund.class), stripeEntities));
+        httpServer.createContext("/v1/", new StripeApiHttpHandler(stripeEntities));
         httpServer.start();
     }
 
@@ -66,11 +56,11 @@ public class StripeMock {
      * @param instant the instant you want to adjust the mock's clock to.
      */
     public static void adjustTimeTo(Instant instant) {
-        stripeMock.clock.setInstant(instant);
+        CLOCK.setInstant(instant);
     }
 
     static Clock getClock() {
-        return stripeMock.clock;
+        return CLOCK;
     }
 
     /**
@@ -78,6 +68,10 @@ public class StripeMock {
      */
     public static void setLogRequests(boolean logRequests) {
         StripeMock.logRequests = logRequests;
+    }
+
+    public static boolean isDisabled() {
+        return DISABLED;
     }
 
     public static boolean isLogRequests() {
@@ -90,7 +84,9 @@ public class StripeMock {
 
     public static synchronized int start(int port) {
         if (DISABLED) {
-            Stripe.apiKey = STRIPE_API_KEY;
+            if (Stripe.apiKey == null) {
+                Stripe.apiKey = STRIPE_API_KEY;
+            }
             return -1;
         }
         if (stripeMock == null) {

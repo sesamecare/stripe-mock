@@ -39,7 +39,8 @@ public class Utilities {
         // Shamelessly stolen from hibernate-types
         String camelCaseRegexp = "([a-z]+)([A-Z]+)";
         String snakeCasePattern = "$1\\_$2";
-        return camelCase.replaceAll(camelCaseRegexp, snakeCasePattern);
+        return camelCase.replaceAll(camelCaseRegexp, snakeCasePattern)
+                        .toLowerCase();
     }
 
     /**

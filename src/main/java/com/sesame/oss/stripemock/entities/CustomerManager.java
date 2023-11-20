@@ -1,6 +1,7 @@
 package com.sesame.oss.stripemock.entities;
 
 import com.sesame.oss.stripemock.http.ResponseCodeException;
+import com.sesame.oss.stripemock.util.Utilities;
 import com.stripe.model.Customer;
 import com.stripe.model.PaymentMethod;
 
@@ -12,13 +13,18 @@ class CustomerManager extends AbstractEntityManager<Customer> {
     private final StripeEntities stripeEntities;
 
     protected CustomerManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, Customer.class, "cus");
+        super(clock, Customer.class, "cus", 14);
         this.stripeEntities = stripeEntities;
     }
 
     @Override
     protected Customer initialize(Customer customer, Map<String, Object> formData) throws ResponseCodeException {
         setDefaultSourceIfNecessary(customer, formData);
+        customer.setDelinquent(false);
+        customer.setInvoicePrefix(Utilities.randomStringOfLength(8)
+                                           .toUpperCase());
+        customer.setNextInvoiceSequence(1L);
+        customer.setTaxExempt("none");
         return super.initialize(customer, formData);
     }
 
@@ -54,7 +60,7 @@ class CustomerManager extends AbstractEntityManager<Customer> {
             throw new ResponseCodeException(400,
                                             "You passed an empty string for 'default_source'. We assume empty values are an attempt to unset a parameter; however 'default_source' cannot be unset. You should remove 'default_source' from your request or supply a non-empty value.",
                                             "parameter_invalid_empty",
-                                            null,
+                                            "invalid_request_error",
                                             null);
         }
 

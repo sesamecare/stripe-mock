@@ -9,7 +9,7 @@ import java.util.Optional;
 
 class AccountManager extends AbstractEntityManager<Account> {
     protected AccountManager(Clock clock) {
-        super(clock, Account.class, "acct");
+        super(clock, Account.class, "acct", 24);
     }
 
     @Override

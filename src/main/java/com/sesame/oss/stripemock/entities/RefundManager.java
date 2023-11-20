@@ -13,7 +13,7 @@ class RefundManager extends AbstractEntityManager<Refund> {
     private final StripeEntities stripeEntities;
 
     protected RefundManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, Refund.class, "re");
+        super(clock, Refund.class, "re", 24);
         this.stripeEntities = stripeEntities;
     }
 
@@ -60,6 +60,11 @@ class RefundManager extends AbstractEntityManager<Refund> {
             return updatedRefund;
         }
         return super.perform(existingRefund, updatedRefund, operation, formData);
+    }
+
+    @Override
+    public boolean canPerformOperation(String operation) {
+        return operation.equals("cancel");
     }
 
     @Override

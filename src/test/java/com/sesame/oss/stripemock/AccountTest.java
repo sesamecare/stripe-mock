@@ -105,6 +105,10 @@ public class AccountTest extends AbstractStripeMockTest {
     }
 
     public static AccountCreateParams defaultCreationParameters(String companyName) {
+        return defaultCreationParametersBuilder(companyName).build();
+    }
+
+    public static Builder defaultCreationParametersBuilder(String companyName) {
         Map<String, String> externalAccount = new HashMap<>();
         externalAccount.put("object", "bank_account");
         externalAccount.put("country", "US");
@@ -150,8 +154,7 @@ public class AccountTest extends AbstractStripeMockTest {
                                                                                       .build())
                                                                .build())
                                   .putExtraParam("external_account", externalAccount)
-                                  .putMetadata("integration_test", "true")
-                                  .build();
+                                  .putMetadata("integration_test", "true");
     }
 
 }

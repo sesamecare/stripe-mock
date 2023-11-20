@@ -17,12 +17,12 @@ public class InvoiceTest extends AbstractStripeMockTest {
     @Test
     void shouldGetTheSameResponseForIdempotentRequests() throws StripeException {
         Customer customer = Customer.create(CustomerCreateParams.builder()
-                                                                .setName("Mike Smith")
+                                                                .setName("stripe-mock test")
                                                                 .build());
         InvoiceCreateParams input = InvoiceCreateParams.builder()
                                                        .setCurrency("usd")
                                                        .setCustomer(customer.getId())
-                                                       .setDescription("this is an invoice")
+                                                       .setDescription("this is a stripe-mock test invoice")
                                                        .putMetadata("integration_test", "true")
                                                        .build();
         RequestOptions options = RequestOptions.builder()
@@ -39,7 +39,7 @@ public class InvoiceTest extends AbstractStripeMockTest {
     @Test
     void shouldNotBeAbleToCreateDifferentEntitiesUsingTheSameIdempotencyKey() throws StripeException {
         Customer customer = Customer.create(CustomerCreateParams.builder()
-                                                                .setName("Mike Smith")
+                                                                .setName("stripe-mock test")
                                                                 .build());
 
         String idempotencyKey = String.valueOf(Math.random());
@@ -71,12 +71,12 @@ public class InvoiceTest extends AbstractStripeMockTest {
     @Test
     void testInvoice() throws Exception {
         Customer customer = Customer.create(CustomerCreateParams.builder()
-                                                                .setName("Mike Smith")
+                                                                .setName("stripe-mock test")
                                                                 .build());
         Invoice createdInvoice = //
                 Invoice.create(InvoiceCreateParams.builder()
                                                   .setCustomer(customer.getId())
-                                                  .setDescription("this is an invoice")
+                                                  .setDescription("this is a stripe-mock test invoice")
                                                   .putMetadata("integration_test", "true")
                                                   .build());
 
@@ -121,16 +121,19 @@ public class InvoiceTest extends AbstractStripeMockTest {
     @Test
     void shouldFinalizeInvoice() throws StripeException {
         Customer customer = Customer.create(CustomerCreateParams.builder()
-                                                                .setName("Mike Smith")
+                                                                .setName("stripe-mock test")
                                                                 .build());
         Invoice createdInvoice = //
                 Invoice.create(InvoiceCreateParams.builder()
                                                   .setCustomer(customer.getId())
-                                                  .setDescription("this is an invoice")
+                                                  .setDescription("this is a stripe-mock test invoice")
                                                   .putMetadata("integration_test", "true")
                                                   .build());
+        assertEquals("draft", createdInvoice.getStatus());
+        Invoice retrievedDraftInvoice = Invoice.retrieve(createdInvoice.getId());
+        assertEquals(createdInvoice, retrievedDraftInvoice);
         Invoice finalizedInvoice = createdInvoice.finalizeInvoice();
-        assertEquals("open", finalizedInvoice.getStatus());
+        assertEquals("paid", finalizedInvoice.getStatus());
 
         Invoice retrievedfinalizedInvoice = Invoice.retrieve(createdInvoice.getId());
         assertEquals(finalizedInvoice, retrievedfinalizedInvoice);

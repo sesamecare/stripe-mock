@@ -17,7 +17,7 @@ public class SetupIntentTest extends AbstractStripeMockTest {
     @Test
     void shouldGetTheSameResponseForIdempotentRequests() throws StripeException {
         Customer customer = Customer.create(CustomerCreateParams.builder()
-                                                                .setName("Mike Smith")
+                                                                .setName("stripe-mock test")
                                                                 .build());
         SetupIntentCreateParams input = SetupIntentCreateParams.builder()
                                                                .setCustomer(customer.getId())
@@ -33,7 +33,7 @@ public class SetupIntentTest extends AbstractStripeMockTest {
     @Test
     void shouldNotBeAbleToCreateDifferentEntitiesUsingTheSameIdempotencyKey() throws StripeException {
         Customer customer = Customer.create(CustomerCreateParams.builder()
-                                                                .setName("Mike Smith")
+                                                                .setName("stripe-mock test")
                                                                 .build());
         String idempotencyKey = String.valueOf(Math.random());
         SetupIntent.create(SetupIntentCreateParams.builder()
@@ -71,7 +71,7 @@ public class SetupIntentTest extends AbstractStripeMockTest {
     @Test
     void testSetupIntent() throws Exception {
         Customer customer = Customer.create(CustomerCreateParams.builder()
-                                                                .setName("Mike Smith")
+                                                                .setName("stripe-mock test")
                                                                 .build());
         SetupIntent createdSetupIntent = //
                 SetupIntent.create(SetupIntentCreateParams.builder()

@@ -4,14 +4,15 @@ import com.stripe.exception.IdempotencyException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Account;
 import com.stripe.model.Transfer;
+import com.stripe.model.TransferReversal;
 import com.stripe.net.RequestOptions;
 import com.stripe.param.TransferCreateParams;
+import com.stripe.param.TransferReversalCollectionCreateParams;
 import com.stripe.param.TransferUpdateParams;
 import org.junit.jupiter.api.Test;
 
 import static com.sesame.oss.stripemock.AccountTest.defaultCreationParameters;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class TransferTest extends AbstractStripeMockTest {
     @Test
@@ -85,5 +86,71 @@ public class TransferTest extends AbstractStripeMockTest {
 
         Transfer retrievedUpdatedTransfer = Transfer.retrieve(createdTransfer.getId());
         assertEquals(updatedTransfer, retrievedUpdatedTransfer);
+
+        TransferReversal transferReversal = retrievedTransfer.getReversals()
+                                                             .create(TransferReversalCollectionCreateParams.builder()
+                                                                                                           .build());
+        assertEquals(9_000L, transferReversal.getAmount());
+        assertEquals(createdTransfer.getId(), transferReversal.getTransfer());
+        Transfer retrievedReversedTransfer = Transfer.retrieve(createdTransfer.getId());
+        assertTrue(retrievedReversedTransfer.getReversed());
+        assertEquals(9_000L,
+                     Transfer.retrieve(createdTransfer.getId())
+                             .getAmountReversed());
+
+        assertEquals(1,
+                     retrievedReversedTransfer.getReversals()
+                                              .getData()
+                                              .size());
+
+    }
+
+    @Test
+    void shouldCreatePartialTransferReversals() throws StripeException {
+        Account account = Account.create(defaultCreationParameters("Company name"));
+        Transfer createdTransfer = //
+                Transfer.create(TransferCreateParams.builder()
+                                                    .setAmount(10_00L)
+                                                    .setCurrency("usd")
+                                                    .putMetadata("integration_test", "true")
+                                                    .setTransferGroup("my transfer group")
+                                                    .setSourceType(TransferCreateParams.SourceType.CARD)
+                                                    .setDescription("my description")
+                                                    .setDestination(account.getId())
+                                                    .build());
+
+        TransferReversal tr1 = createdTransfer.getReversals()
+                                              .create(TransferReversalCollectionCreateParams.builder()
+                                                                                            .setAmount(5_00L)
+                                                                                            .build());
+        assertEquals(5_00L, tr1.getAmount());
+        assertEquals(createdTransfer.getId(), tr1.getTransfer());
+
+        Transfer t1 = Transfer.retrieve(createdTransfer.getId());
+        assertFalse(t1.getReversed());
+        assertEquals(5_00L, t1.getAmountReversed());
+        assertEquals(5_00L,
+                     t1.getReversals()
+                       .getData()
+                       .stream()
+                       .mapToLong(TransferReversal::getAmount)
+                       .sum());
+
+        TransferReversal tr2 = createdTransfer.getReversals()
+                                              .create(TransferReversalCollectionCreateParams.builder()
+                                                                                            .setAmount(5_00L)
+                                                                                            .build());
+        assertEquals(5_00L, tr2.getAmount());
+        assertEquals(createdTransfer.getId(), tr2.getTransfer());
+
+        Transfer t2 = Transfer.retrieve(createdTransfer.getId());
+        assertTrue(t2.getReversed());
+        assertEquals(10_00L, t2.getAmountReversed());
+        assertEquals(10_00L,
+                     t2.getReversals()
+                       .getData()
+                       .stream()
+                       .mapToLong(TransferReversal::getAmount)
+                       .sum());
     }
 }

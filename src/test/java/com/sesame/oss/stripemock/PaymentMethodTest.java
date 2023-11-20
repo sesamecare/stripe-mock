@@ -103,30 +103,29 @@ public class PaymentMethodTest extends AbstractStripeMockTest {
     }
 
     @Test
-    void shouldSetDefaultPaymentMethodForCustomerAutomatically() throws StripeException {
+    void shouldNotSetDefaultPaymentMethodForCustomerAutomatically() throws StripeException {
         Customer customer = Customer.create(CustomerCreateParams.builder()
                                                                 .setName("Stripe-mock test")
                                                                 .build());
-        PaymentMethod pm = PaymentMethod.create(PaymentMethodCreateParams.builder()
-                                                                         .putMetadata("integration_test", "true")
-                                                                         .setType(PaymentMethodCreateParams.Type.CARD)
-                                                                         .setCard(PaymentMethodCreateParams.Token.builder()
-                                                                                                                 .setToken("tok_mastercard")
-                                                                                                                 .build())
-                                                                         .build())
-                                        .attach(PaymentMethodAttachParams.builder()
-                                                                         .setCustomer(customer.getId())
-                                                                         .build());
-        assertEquals(pm.getId(),
-                     Customer.retrieve(customer.getId())
-                             .getInvoiceSettings()
-                             .getDefaultPaymentMethod());
+        PaymentMethod.create(PaymentMethodCreateParams.builder()
+                                                      .putMetadata("integration_test", "true")
+                                                      .setType(PaymentMethodCreateParams.Type.CARD)
+                                                      .setCard(PaymentMethodCreateParams.Token.builder()
+                                                                                              .setToken("tok_mastercard")
+                                                                                              .build())
+                                                      .build())
+                     .attach(PaymentMethodAttachParams.builder()
+                                                      .setCustomer(customer.getId())
+                                                      .build());
+        Customer.InvoiceSettings customerInvoiceSettings = Customer.retrieve(customer.getId())
+                                                                   .getInvoiceSettings();
+        assertTrue(customerInvoiceSettings == null || customerInvoiceSettings.getDefaultPaymentMethod() == null);
     }
 
     @Test
     void shouldListEmptyPaymentMethodsForCustomer() throws StripeException {
         Customer customer = Customer.create(CustomerCreateParams.builder()
-                                                                .setName("Mike Smith")
+                                                                .setName("stripe-mock test")
                                                                 .build());
         PaymentMethodCollection paymentMethods = PaymentMethod.list(PaymentMethodListParams.builder()
                                                                                            .setCustomer(customer.getId())
@@ -140,7 +139,7 @@ public class PaymentMethodTest extends AbstractStripeMockTest {
     @Test
     void shouldListPaymentMethodsForCustomer() throws StripeException {
         Customer c1 = Customer.create(CustomerCreateParams.builder()
-                                                          .setName("Mike Smith")
+                                                          .setName("stripe-mock test")
                                                           .build());
         Customer c2 = Customer.create(CustomerCreateParams.builder()
                                                           .setName("Tim Jones")
@@ -161,7 +160,7 @@ public class PaymentMethodTest extends AbstractStripeMockTest {
         PaymentMethod pm2 = PaymentMethod.create(PaymentMethodCreateParams.builder()
                                                                           /*
                                                                           .setBillingDetails(BillingDetails.builder()
-                                                                                                           .setName("Mike Smith")
+                                                                                                           .setName("stripe-mock test")
                                                                                                            .setAddress(Address.builder()
                                                                                                                               .setCountry("US")
                                                                                                                               .setCity("New York")
@@ -214,7 +213,7 @@ public class PaymentMethodTest extends AbstractStripeMockTest {
     @Test
     void shouldAutomaticallySetCardData() throws StripeException {
         Customer c1 = Customer.create(CustomerCreateParams.builder()
-                                                          .setName("Mike Smith")
+                                                          .setName("stripe-mock test")
                                                           .build());
 
         PaymentMethod pm1 = PaymentMethod.create(PaymentMethodCreateParams.builder()

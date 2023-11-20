@@ -25,11 +25,19 @@ abstract class AbstractEntityManager<T extends ApiResource & HasId> implements E
 
     private final Class<T> entityClass;
     private final String idPrefix;
+    private final int idLength;
 
-    protected AbstractEntityManager(Clock clock, Class<T> entityClass, String idPrefix) {
+    protected AbstractEntityManager(Clock clock, Class<T> entityClass, String idPrefix, int idLength) {
         this.clock = clock;
         this.entityClass = entityClass;
         this.idPrefix = idPrefix;
+        this.idLength = idLength;
+    }
+
+    @Override
+    public T add(Map<String, Object> formData, String parentEntityType, String parentEntityId) throws ResponseCodeException {
+        // Most entities do not support related sub-entities, so this is a reasonable default
+        throw new UnsupportedOperationException("Entity does not support sub-entities");
     }
 
     @Override
@@ -37,7 +45,7 @@ abstract class AbstractEntityManager<T extends ApiResource & HasId> implements E
         // They give us form data, so this is a ghetto way to turn it back into an object.
 
         // We're the only ones that are allowed to specify what the id should be
-        String id = Utilities.randomIdWithPrefix(idPrefix, 24);
+        String id = Utilities.randomIdWithPrefix(idPrefix, idLength);
         // metadata must always be a map, even if it's empty. It should never be null.
         // So we can kill two birds with one stone, here
         Map<String, Object> metadata = (Map<String, Object>) formData.computeIfAbsent("metadata", ignored -> new HashMap<>());
@@ -57,7 +65,7 @@ abstract class AbstractEntityManager<T extends ApiResource & HasId> implements E
         T existing = entities.putIfAbsent(id, entity);
         if (existing != null) {
             // This shouldn't happen unless people start overriding ids, but we should still check
-            throw new ResponseCodeException(400, String.format("Overridden payment method with id %s already exists", id));
+            throw new ResponseCodeException(400, String.format("Overridden %s with id %s already exists", entityClass.getSimpleName(), id));
         }
 
         return entity;
@@ -71,7 +79,6 @@ abstract class AbstractEntityManager<T extends ApiResource & HasId> implements E
         }
         JsonObject root = Utilities.PRODUCER_GSON.toJsonTree(existingEntity)
                                                  .getAsJsonObject();
-        ensureFormDataSpecifiesObjectType(formData);
         merge(root, formData);
         T newEntity = ApiResource.GSON.fromJson(root, entityClass);
         T postOperationEntity = perform(existingEntity, newEntity, operation, formData);
@@ -118,8 +125,22 @@ abstract class AbstractEntityManager<T extends ApiResource & HasId> implements E
     }
 
     @Override
+    public String getNormalizedEntityName() {
+        // PaymentIntent -> payment_intent + s -> payment_intents
+        return Utilities.snakeCase(entityClass.getSimpleName()) + "s";
+    }
+
+    @Override
     public void bootstrap() {
 
+    }
+
+    @Override
+    public boolean canPerformOperation(String operation) {
+        // The default is that we don't support any operations other than MAGIC_UPDATE_OPERATION.
+        // This can be seen in the default implementation of perform().
+        // As such, it's reasonable to return false as a default here, and let implementations override it as they choose.
+        return false;
     }
 
     /**
@@ -162,16 +183,13 @@ abstract class AbstractEntityManager<T extends ApiResource & HasId> implements E
         // As this mock gets more and more complete, this should happen less and less often.
         throw new ResponseCodeException(400,
                                         String.format("Entity type %s does not yet support operation '%s'",
-                                                      Utilities.snakeCase(entityClass.getSimpleName())
-                                                               .toLowerCase(),
+                                                      Utilities.snakeCase(entityClass.getSimpleName()),
                                                       operation));
     }
 
     private void ensureFormDataSpecifiesObjectType(Map<String, Object> formData) {
         if (!formData.containsKey("object")) {
-            formData.put("object",
-                         Utilities.snakeCase(entityClass.getSimpleName())
-                                  .toLowerCase());
+            formData.put("object", Utilities.snakeCase(entityClass.getSimpleName()));
         }
     }
 

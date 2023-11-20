@@ -1,11 +1,10 @@
 package com.sesame.oss.stripemock.http;
 
 import com.sesame.oss.stripemock.StripeMock;
-import com.sesame.oss.stripemock.entities.EntityManager;
 import com.sesame.oss.stripemock.entities.StripeEntities;
+import com.sesame.oss.stripemock.http.EntityResponse.Multiple;
+import com.sesame.oss.stripemock.http.EntityResponse.Single;
 import com.sesame.oss.stripemock.util.Utilities;
-import com.stripe.model.HasId;
-import com.stripe.net.ApiResource;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -20,16 +19,16 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class StripeApiHttpHandler<T extends ApiResource & HasId> implements HttpHandler {
+public class StripeApiHttpHandler implements HttpHandler {
     private final IdempotencyManager idempotencyManager = new IdempotencyManager();
     private final Parser parser = new Parser();
 
     private final JsonResponseProducer jsonResponseProducer;
-    private final EntityRequestHandler<T> requestHandler;
+    private final EntityRequestHandler requestHandler;
 
-    public StripeApiHttpHandler(EntityManager<T> entityManager, StripeEntities stripeEntities) {
+    public StripeApiHttpHandler(StripeEntities stripeEntities) {
         this.jsonResponseProducer = new JsonResponseProducer(stripeEntities);
-        this.requestHandler = new EntityRequestHandler<>(entityManager);
+        this.requestHandler = new EntityRequestHandler(stripeEntities);
     }
 
     @Override
@@ -106,21 +105,20 @@ public class StripeApiHttpHandler<T extends ApiResource & HasId> implements Http
                                          try {
                                              Map<String, Object> requestBodyFormData =
                                                      parser.parseRequestBody(requestBody, requestHeaders.getFirst("Content-Type"));
-                                             TypedResponse<T> response = requestHandler.handleRequest(method, path, queryParameters, requestBodyFormData);
+                                             EntityResponse response = requestHandler.handleRequest(method, path, queryParameters, requestBodyFormData);
                                              return switch (response) {
-                                                 case TypedResponse.Single(int code, T entity) -> new RawResponse(code,
-                                                                                                                  jsonResponseProducer.toJson(entity,
-                                                                                                                                              requestBodyFormData,
-                                                                                                                                              queryParameters),
-                                                                                                                  headers,
-                                                                                                                  requestId);
-                                                 case TypedResponse.List(int code, List<T> listOfEntities) -> new RawResponse(code,
-                                                                                                                              jsonResponseProducer.toJson(
-                                                                                                                                      listOfEntities,
-                                                                                                                                      requestBodyFormData,
-                                                                                                                                      queryParameters),
-                                                                                                                              headers,
-                                                                                                                              requestId);
+                                                 case Single(int code, Object entity) -> new RawResponse(code,
+                                                                                                         jsonResponseProducer.toJson(entity,
+                                                                                                                                     requestBodyFormData,
+                                                                                                                                     queryParameters),
+                                                                                                         headers,
+                                                                                                         requestId);
+                                                 case Multiple(int code, List<?> entities) -> new RawResponse(code,
+                                                                                                              jsonResponseProducer.toJson(entities,
+                                                                                                                                          requestBodyFormData,
+                                                                                                                                          queryParameters),
+                                                                                                              headers,
+                                                                                                              requestId);
                                              };
                                          } catch (ResponseCodeException e) {
                                              return new RawResponse(e.getResponseCode(), Utilities.toApiError(e), headers, requestId);

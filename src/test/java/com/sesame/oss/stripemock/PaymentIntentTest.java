@@ -1,6 +1,7 @@
 package com.sesame.oss.stripemock;
 
 import com.stripe.exception.IdempotencyException;
+import com.stripe.exception.InvalidRequestException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Customer;
 import com.stripe.model.PaymentIntent;
@@ -8,6 +9,7 @@ import com.stripe.model.PaymentMethod;
 import com.stripe.model.StripeError;
 import com.stripe.net.RequestOptions;
 import com.stripe.param.*;
+import com.stripe.param.CustomerUpdateParams.InvoiceSettings;
 import com.stripe.param.PaymentIntentUpdateParams.SetupFutureUsage;
 import com.stripe.param.PaymentIntentUpdateParams.Shipping;
 import com.stripe.param.PaymentIntentUpdateParams.Shipping.Address;
@@ -93,7 +95,7 @@ public class PaymentIntentTest extends AbstractStripeMockTest {
                                                                        .setCustomer(customer.getId())
                                                                        .setSetupFutureUsage(SetupFutureUsage.OFF_SESSION)
                                                                        .setShipping(Shipping.builder()
-                                                                                            .setName("Mike Smith")
+                                                                                            .setName("stripe-mock test")
                                                                                             .setAddress(Address.builder()
                                                                                                                .setCountry("US")
                                                                                                                .setCity("New York")
@@ -109,18 +111,16 @@ public class PaymentIntentTest extends AbstractStripeMockTest {
 
         StripeException wrongPaymentMethod = assertThrows(StripeException.class,
                                                           () -> createdPaymentIntent.confirm(PaymentIntentConfirmParams.builder()
-                                                                                                                       .setPaymentMethod("pm_nope")
+                                                                                                                       .setPaymentMethod(
+                                                                                                                               "pm_card_visa_chargeDeclined")
                                                                                                                        .build()));
-        assertEquals(
-                "No such PaymentMethod: 'pm_nope'; It's possible this PaymentMethod exists on one of your connected accounts, in which case you should retry this request on that connected account. Learn more at https://stripe.com/docs/connect/authentication",
-                wrongPaymentMethod.getStripeError()
-                                  .getMessage());
-        StripeError lastPaymentError = PaymentIntent.retrieve(createdPaymentIntent.getId())
-                                                    .getLastPaymentError();
+        assertEquals("Your card was declined.",
+                     wrongPaymentMethod.getStripeError()
+                                       .getMessage());
+        PaymentIntent postConfirmationFailurePaymentIntent = PaymentIntent.retrieve(createdPaymentIntent.getId());
+        StripeError lastPaymentError = postConfirmationFailurePaymentIntent.getLastPaymentError();
         assertNotNull(lastPaymentError);
-        assertEquals(
-                "No such PaymentMethod: 'pm_nope'; It's possible this PaymentMethod exists on one of your connected accounts, in which case you should retry this request on that connected account. Learn more at https://stripe.com/docs/connect/authentication",
-                lastPaymentError.getMessage());
+        assertEquals("Your card was declined.", lastPaymentError.getMessage());
 
         PaymentIntent confirmedPaymentIntent = createdPaymentIntent.confirm(PaymentIntentConfirmParams.builder()
                                                                                                       .setPaymentMethod("pm_card_visa")
@@ -128,32 +128,31 @@ public class PaymentIntentTest extends AbstractStripeMockTest {
                                                                                                       .build());
         // todo: assert that we only transition into this state if the capture method is automatic
         assertEquals("succeeded", confirmedPaymentIntent.getStatus());
-
-
-        StripeException applyCustomerBalanceUnsupported = assertThrows(StripeException.class, confirmedPaymentIntent::applyCustomerBalance);
-        assertEquals("apply_customer_balance not supported yet",
-                     applyCustomerBalanceUnsupported.getStripeError()
-                                                    .getMessage());
     }
 
     /**
      * This means that the payment intent itself does not require a payment method, since it's attached to the customer already.
      */
     @Test
-    void shouldAllowConfirmationIfCustomerHasSavedPaymentMethod() throws StripeException {
+    void shouldNotAllowConfirmationWithoutExplicitPaymentMethodEvenIfCustomerHasSavedPaymentMethod() throws StripeException {
         Customer customer = Customer.create(CustomerCreateParams.builder()
                                                                 .setName("Stripe-mock test")
                                                                 .build());
-        PaymentMethod.create(PaymentMethodCreateParams.builder()
-                                                      .putMetadata("integration_test", "true")
-                                                      .setType(PaymentMethodCreateParams.Type.CARD)
-                                                      .setCard(PaymentMethodCreateParams.Token.builder()
-                                                                                              .setToken("tok_mastercard")
-                                                                                              .build())
-                                                      .build())
-                     .attach(PaymentMethodAttachParams.builder()
-                                                      .setCustomer(customer.getId())
-                                                      .build());
+        PaymentMethod paymentMethod = PaymentMethod.create(PaymentMethodCreateParams.builder()
+                                                                                    .putMetadata("integration_test", "true")
+                                                                                    .setType(PaymentMethodCreateParams.Type.CARD)
+                                                                                    .setCard(PaymentMethodCreateParams.Token.builder()
+                                                                                                                            .setToken("tok_mastercard")
+                                                                                                                            .build())
+                                                                                    .build())
+                                                   .attach(PaymentMethodAttachParams.builder()
+                                                                                    .setCustomer(customer.getId())
+                                                                                    .build());
+        customer.update(CustomerUpdateParams.builder()
+                                            .setInvoiceSettings(InvoiceSettings.builder()
+                                                                               .setDefaultPaymentMethod(paymentMethod.getId())
+                                                                               .build())
+                                            .build());
         PaymentIntent paymentIntent = //
                 PaymentIntent.create(PaymentIntentCreateParams.builder()
                                                               .setCustomer(customer.getId())
@@ -164,8 +163,15 @@ public class PaymentIntentTest extends AbstractStripeMockTest {
                                                               .setCaptureMethod(PaymentIntentCreateParams.CaptureMethod.MANUAL)
                                                               .setErrorOnRequiresAction(false)
                                                               .build());
-        PaymentIntent confirmedPaymentIntent = paymentIntent.confirm();
-        assertEquals("succeeded", confirmedPaymentIntent.getStatus());
+        InvalidRequestException missingPaymentMethod = assertThrows(InvalidRequestException.class, paymentIntent::confirm);
+        assertEquals(String.format(
+                             "You cannot confirm this PaymentIntent because it's missing a payment method. To confirm the PaymentIntent with %s, specify a payment method attached to this customer along with the customer ID.",
+                             customer.getId()),
+                     missingPaymentMethod.getStripeError()
+                                         .getMessage());
+        assertEquals("payment_intent_unexpected_state",
+                     missingPaymentMethod.getStripeError()
+                                         .getCode());
 
     }
 
@@ -188,7 +194,7 @@ public class PaymentIntentTest extends AbstractStripeMockTest {
                                                        () -> PaymentIntent.create(PaymentIntentCreateParams.builder()
                                                                                                            .setCurrency("usd")
                                                                                                            .build()));
-        assertEquals("Must provide 'amount'",
+        assertEquals("Missing required param: amount.",
                      stripeException.getStripeError()
                                     .getMessage());
     }
