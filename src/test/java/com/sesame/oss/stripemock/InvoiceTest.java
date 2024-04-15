@@ -5,10 +5,13 @@ import com.stripe.exception.InvalidRequestException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Customer;
 import com.stripe.model.Invoice;
+import com.stripe.model.InvoiceItem;
 import com.stripe.net.RequestOptions;
 import com.stripe.param.CustomerCreateParams;
 import com.stripe.param.InvoiceCreateParams;
+import com.stripe.param.InvoiceItemCreateParams;
 import com.stripe.param.InvoiceUpdateParams;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -118,8 +121,41 @@ public class InvoiceTest extends AbstractStripeMockTest {
                                             .getType());
     }
 
+    @Disabled("This test accurately represents the stripe behavior, but it's not supported in the mock yet.")
     @Test
-    void shouldFinalizeInvoice() throws StripeException {
+    void shouldFinalizeInvoiceToDraftWithItems() throws StripeException {
+        Customer customer = Customer.create(CustomerCreateParams.builder()
+                                                                .setName("stripe-mock test")
+                                                                .build());
+        Invoice createdInvoice = //
+                Invoice.create(InvoiceCreateParams.builder()
+                                                  .setCustomer(customer.getId())
+                                                  .setDescription("this is a stripe-mock test invoice")
+                                                  .putMetadata("integration_test", "true")
+                                                  .build());
+        assertEquals("draft", createdInvoice.getStatus());
+        Invoice retrievedDraftInvoice = Invoice.retrieve(createdInvoice.getId());
+        assertEquals(createdInvoice, retrievedDraftInvoice);
+        // Setting the 'invoice' field on an invoice item adds it to the invoice.
+        InvoiceItem.create(InvoiceItemCreateParams.builder()
+                                                  .setCustomer(customer.getId())
+                                                  .setInvoice(createdInvoice.getId())
+                                                  .setAmount(10_00L)
+                                                  .setCurrency("usd")
+                                                  .build());
+
+        // Because there's an invoice item with a non-0 cost, finalizing the invoice won't also immediately transition it to "paid".
+        // If the invoice was automatically payable, as it would have been with a total cost of 0, then the status would immediately
+        // have been "paid".
+        Invoice finalizedInvoice = createdInvoice.finalizeInvoice();
+        assertEquals("open", finalizedInvoice.getStatus());
+
+        Invoice retrievedfinalizedInvoice = Invoice.retrieve(createdInvoice.getId());
+        assertInvoiceEquals(finalizedInvoice, retrievedfinalizedInvoice);
+    }
+
+    @Test
+    void shouldFinalizeInvoiceWith0CostToPaid() throws StripeException {
         Customer customer = Customer.create(CustomerCreateParams.builder()
                                                                 .setName("stripe-mock test")
                                                                 .build());
@@ -136,6 +172,6 @@ public class InvoiceTest extends AbstractStripeMockTest {
         assertEquals("paid", finalizedInvoice.getStatus());
 
         Invoice retrievedfinalizedInvoice = Invoice.retrieve(createdInvoice.getId());
-        assertEquals(finalizedInvoice, retrievedfinalizedInvoice);
+        assertInvoiceEquals(finalizedInvoice, retrievedfinalizedInvoice);
     }
 }

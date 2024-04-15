@@ -1,10 +1,9 @@
 package com.sesame.oss.stripemock.entities;
 
 import com.sesame.oss.stripemock.http.ResponseCodeException;
-import com.stripe.model.Customer;
-import com.stripe.model.Invoice;
-import com.stripe.model.PaymentIntent;
-import com.stripe.model.Subscription;
+import com.sesame.oss.stripemock.util.Utilities;
+import com.stripe.model.*;
+import com.stripe.net.ApiResource;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -35,6 +34,14 @@ class SubscriptionManager extends AbstractEntityManager<Subscription> {
         invoiceParameters.put("customer", subscription.getCustomer());
         EntityManager<Invoice> invoiceEntityManager = stripeEntities.getEntityManager(Invoice.class);
         Invoice firstInvoice = invoiceEntityManager.add(invoiceParameters);
+        for (SubscriptionItem subscriptionItem : subscription.getItems()
+                                                             .getData()) {
+            subscriptionItem.setId(Utilities.randomIdWithPrefix("si", 24));
+            subscriptionItem.setSubscription(subscription.getId());
+            firstInvoice.getLines()
+                        .getData()
+                        .add(toInvoiceLineItem(subscriptionItem));
+        }
         // invoices that are part of a subscription are automatically finalized, meaning that they can't change.
         // This moves them from 'draft' to 'open'
         firstInvoice = invoiceEntityManager.perform(firstInvoice.getId(), "finalize", new HashMap<>())
@@ -69,6 +76,22 @@ class SubscriptionManager extends AbstractEntityManager<Subscription> {
         subscription.setLatestInvoice(firstInvoice.getId());
         subscription.setStatus("incomplete");
         return super.initialize(subscription, formData);
+    }
+
+    private InvoiceLineItem toInvoiceLineItem(SubscriptionItem subscriptionItem) {
+        String json = Utilities.PRODUCER_GSON.toJson(subscriptionItem);
+        InvoiceLineItem invoiceLineItem = ApiResource.GSON.fromJson(json, InvoiceLineItem.class);
+        invoiceLineItem.setObject("line_item");
+        invoiceLineItem.setId(Utilities.randomIdWithPrefix("il_tmp", 24));
+
+        // todo: should we set anything else?
+        Price price = subscriptionItem.getPrice();
+        invoiceLineItem.setCurrency(price.getCurrency());
+        invoiceLineItem.setAmount(price.getUnitAmount());
+        invoiceLineItem.setLivemode(false);
+        invoiceLineItem.setSubscriptionItem(subscriptionItem.getId());
+        invoiceLineItem.setSubscription(subscriptionItem.getSubscription());
+        return invoiceLineItem;
     }
 
     @Override

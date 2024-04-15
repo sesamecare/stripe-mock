@@ -3,11 +3,13 @@ package com.sesame.oss.stripemock.entities;
 import com.sesame.oss.stripemock.http.ResponseCodeException;
 import com.stripe.model.Customer;
 import com.stripe.model.Invoice;
+import com.stripe.model.InvoiceLineItem;
 import com.stripe.model.InvoiceLineItemCollection;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -76,26 +78,25 @@ class InvoiceManager extends AbstractEntityManager<Invoice> {
 
     @Override
     protected Invoice perform(Invoice existingInvoice, Invoice updatedInvoice, String operation, Map<String, Object> formData) throws ResponseCodeException {
+        // https://docs.stripe.com/invoicing/integration/workflow-transitions
         if (operation.equals("finalize")) {
-            updatedInvoice.setStatus("paid");
-            updatedInvoice.setPaid(true);
+            long nowInEpochSecond = Instant.now(clock)
+                                           .getEpochSecond();
+            updatedInvoice.getStatusTransitions()
+                          .setFinalizedAt(nowInEpochSecond);
 
-            updatedInvoice.setAttempted(true);
-            updatedInvoice.setEffectiveAt(Instant.now(clock)
-                                                 .getEpochSecond());
+            updatedInvoice.setStatus("open");
+            updatedInvoice.setPaid(false);
             updatedInvoice.setEndingBalance(0L);
+            updatedInvoice.setSubtotal(0L);
+            updatedInvoice.setSubtotalExcludingTax(0L);
+
+            attemptToPayIfNecessary(updatedInvoice, nowInEpochSecond);
+
             // todo: hosted_invoice_url, invoice_pdf
             // "hosted_invoice_url": "https://invoice.stripe.com/i/acct_1D4ByEF2zu6DinIq/test_YWNjdF8xRDRCeUVGMnp1NkRpbklxLF9PeE1JeHNFSHVZTGd0MnNhcDk2akdFYUNlOFA5UUo5LDg5ODEzMjY40200Ghh1Nmex?s\u003dap",
             // "invoice_pdf": "https://pay.stripe.com/invoice/acct_1D4ByEF2zu6DinIq/test_YWNjdF8xRDRCeUVGMnp1NkRpbklxLF9PeE1JeHNFSHVZTGd0MnNhcDk2akdFYUNlOFA5UUo5LDg5ODEzMjY40200Ghh1Nmex/pdf?s\u003dap",
             updatedInvoice.setNumber("todo: what should this be? 666970EC-0001");
-            updatedInvoice.getStatusTransitions()
-                          .setFinalizedAt(Instant.now(clock)
-                                                 .getEpochSecond());
-            updatedInvoice.getStatusTransitions()
-                          .setPaidAt(Instant.now(clock)
-                                            .getEpochSecond());
-            updatedInvoice.setSubtotal(0L);
-            updatedInvoice.setSubtotalExcludingTax(0L);
         } else if (operation.equals(MAGIC_UPDATE_OPERATION)) {
             if (!updatedInvoice.getStatus()
                                .equals("draft")) {
@@ -104,6 +105,43 @@ class InvoiceManager extends AbstractEntityManager<Invoice> {
             }
         }
         return updatedInvoice;
+    }
+
+    private static void attemptToPayIfNecessary(Invoice updatedInvoice, long nowInEpochSecond) {
+        if (canAndShouldTransitionToPaid(updatedInvoice)) {
+            updatedInvoice.setStatus("paid");
+            updatedInvoice.setPaid(true);
+            updatedInvoice.setAttempted(true);
+            updatedInvoice.setEffectiveAt(nowInEpochSecond);
+            updatedInvoice.getStatusTransitions()
+                          .setPaidAt(nowInEpochSecond);
+            // todo: change these amounts when we actually support charging for invoices
+            updatedInvoice.setEndingBalance(0L);
+            updatedInvoice.setSubtotal(0L);
+            updatedInvoice.setSubtotalExcludingTax(0L);
+        }
+    }
+
+    private static boolean canAndShouldTransitionToPaid(Invoice updatedInvoice) {
+        List<InvoiceLineItem> lines = updatedInvoice.getLines()
+                                                    .getData();
+        if (lines.isEmpty()) {
+            // Nothing to pay for, transition immediately to "paid"
+            return true;
+        } else {
+            long totalAmount = lines.stream()
+                                    .mapToLong(InvoiceLineItem::getAmount)
+                                    .sum();
+            if (totalAmount == 0) {
+                // There were things to pay for, but they sum up to 0, so transition immediately to "paid"
+                return true;
+            } else {
+                // There were things to pay for, so we need to actually try to charge for them.
+                // todo: when we can extract payment for invoice items automatically, this should change.
+                //  But for now, let's behave as if it was not possible to get payment, even though we wanted to.
+                return false;
+            }
+        }
     }
 
     @Override

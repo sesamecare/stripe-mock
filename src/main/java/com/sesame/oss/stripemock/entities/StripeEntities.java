@@ -28,6 +28,7 @@ public class StripeEntities {
         add(new TransferManager(clock, this));
         add(new CustomerManager(clock, this));
         add(new InvoiceManager(clock, this));
+        add(new InvoiceItemManager(clock, this));
         add(new ProductManager(clock));
         add(new AccountManager(clock));
     }
@@ -47,7 +48,11 @@ public class StripeEntities {
      * @see EntityManager#getNormalizedEntityName()
      */
     public EntityManager<?> getEntityManager(String normalizedEntityName) {
-        return entityManagersByNormalizedEntityName.get(normalizedEntityName);
+        EntityManager<? extends ApiResource> entityManager = entityManagersByNormalizedEntityName.get(normalizedEntityName);
+        if (entityManager == null) {
+            throw new IllegalStateException("Unable to find entity manager for normalized entity name: " + normalizedEntityName);
+        }
+        return entityManager;
     }
 
     public void clear() {

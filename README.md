@@ -13,7 +13,7 @@ your tests "directly" inside the mock's memory, this would be a bad idea, becaus
 could not possibly do if you were testing using a real Stripe connection. 
 
 There are some exceptions, however. These exceptions are mostly to smooth the transition from using real Stripe testing to using a mock, and they are related
-to the boostrapping done in `StripeMock.reset()`. 
+to the bootstrapping done in `StripeMock.reset()`. 
 1. You can change the time using `StripeMock.adjustTime()` to let you set up things like subscriptions in the past. This is useful when migrating from using 
    Stripe testing, where you might rely on things you created in the past in Stripe.
 2. You can set the id for entities on creation by passing `StripeMock.OVERRIDE_ID_FOR_TESTING` in via the metadata.

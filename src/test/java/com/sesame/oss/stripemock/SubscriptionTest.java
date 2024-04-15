@@ -197,6 +197,65 @@ public class SubscriptionTest extends AbstractStripeMockTest {
     }
 
     @Test
+    void shouldKeepInvoiceOpenIfSubscriptionCannotBeImmediatelyPaidFor() throws StripeException {
+        Product product = Product.create(ProductCreateParams.builder()
+                                                            .setName("Stripe-mock test product")
+                                                            .putMetadata("integration_test", "true")
+                                                            .build());
+        Customer customer = Customer.create(CustomerCreateParams.builder()
+                                                                .setName("stripe-mock test")
+                                                                .build());
+
+        Recurring recurring = Recurring.builder()
+                                       .setInterval(Recurring.Interval.MONTH)
+                                       .setIntervalCount(1L)
+                                       .build();
+        PriceData priceData = PriceData.builder()
+                                       .setCurrency("USD")
+                                       .setProduct(product.getId())
+                                       .setRecurring(recurring)
+                                       .setUnitAmount(10_00L)
+                                       .build();
+
+        Subscription createdSubscription = //
+                Subscription.create(SubscriptionCreateParams.builder()
+                                                            .putMetadata("integration_test", "true")
+                                                            .addItem(Item.builder()
+                                                                         .setPriceData(priceData)
+                                                                         .build())
+                                                            .setCustomer(customer.getId())
+                                                            .setPaymentBehavior(PaymentBehavior.DEFAULT_INCOMPLETE)
+                                                            .addExpand("latest_invoice.payment_intent")
+                                                            .build());
+
+        assertEquals("open",
+                     createdSubscription.getLatestInvoiceObject()
+                                        .getStatus());
+        assertEquals("incomplete", createdSubscription.getStatus());
+
+
+        Subscription retrievedSubscription = Subscription.retrieve(createdSubscription.getId());
+        assertEquals(createdSubscription, retrievedSubscription);
+
+        assertNotNull(createdSubscription.getLatestInvoice());
+        assertNotNull(createdSubscription.getLatestInvoiceObject()
+                                         .getPaymentIntentObject());
+
+        Invoice subscriptionInvoice = Invoice.retrieve(createdSubscription.getLatestInvoice(),
+                                                       InvoiceRetrieveParams.builder()
+                                                                            .addExpand("payment_intent")
+                                                                            .build(),
+                                                       RequestOptions.builder()
+                                                                     .build());
+        assertNotNull(subscriptionInvoice.getPaymentIntent());
+        assertNotNull(subscriptionInvoice.getPaymentIntentObject());
+        assertInvoiceEquals(createdSubscription.getLatestInvoiceObject(), subscriptionInvoice);
+
+        customer.delete();
+        product.delete();
+    }
+
+    @Test
     void testSubscription() throws Exception {
         Product product = Product.create(ProductCreateParams.builder()
                                                             .setName("Stripe-mock test product")
