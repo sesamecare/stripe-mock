@@ -31,7 +31,7 @@ public final class BalanceTransactionMapper {
         balanceTransaction.setFee(0L);
         balanceTransaction.setFeeDetails(Collections.emptyList());
         balanceTransaction.setCurrency(refund.getCurrency());
-        balanceTransaction.setDescription(refund.getDescription());
+        balanceTransaction.setDescription(null);
         balanceTransaction.setId(refund.getBalanceTransaction());
         balanceTransaction.setObject("balance_transaction");
         balanceTransaction.setStatus(refund.getStatus()
@@ -55,7 +55,7 @@ public final class BalanceTransactionMapper {
         balanceTransaction.setFee(0L);
         balanceTransaction.setFeeDetails(Collections.emptyList());
         balanceTransaction.setCurrency(charge.getCurrency());
-        balanceTransaction.setDescription(charge.getDescription());
+        balanceTransaction.setDescription(null);
         balanceTransaction.setId(charge.getBalanceTransaction());
         balanceTransaction.setObject("balance_transaction");
         balanceTransaction.setStatus(charge.getStatus()
@@ -81,7 +81,7 @@ public final class BalanceTransactionMapper {
         balanceTransaction.setFee(0L);
         balanceTransaction.setFeeDetails(Collections.emptyList());
         balanceTransaction.setCurrency(payout.getCurrency());
-        balanceTransaction.setDescription(payout.getDescription());
+        balanceTransaction.setDescription(null);
         balanceTransaction.setId(payout.getBalanceTransaction());
         balanceTransaction.setObject("balance_transaction");
         balanceTransaction.setStatus(payout.getStatus()
@@ -108,7 +108,7 @@ public final class BalanceTransactionMapper {
         balanceTransaction.setFee(0L);
         balanceTransaction.setFeeDetails(Collections.emptyList());
         balanceTransaction.setCurrency(transfer.getCurrency());
-        balanceTransaction.setDescription(transfer.getDescription());
+        balanceTransaction.setDescription(null);
         balanceTransaction.setId(transfer.getBalanceTransaction());
         balanceTransaction.setObject("balance_transaction");
         balanceTransaction.setStatus("available");
@@ -165,7 +165,7 @@ public final class BalanceTransactionMapper {
         balanceTransaction.setDescription("REFUND FOR PAYMENT");
         balanceTransaction.setId(transferReversal.getBalanceTransaction());
         Refund source = new Refund();
-        source.setAmount(amount);
+        source.setAmount(-amount);
         source.setBalanceTransaction(transferReversal.getBalanceTransaction());
         source.setCreated(transferReversal.getCreated());
         source.setCurrency(transferReversal.getCurrency());

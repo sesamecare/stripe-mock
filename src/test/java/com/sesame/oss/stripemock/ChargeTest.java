@@ -16,6 +16,7 @@ public class ChargeTest extends AbstractStripeMockTest {
         Charge charge = Charge.create(ChargeCreateParams.builder()
                                                         .setAmount(10_00L)
                                                         .setCurrency("usd")
+                                                        .putMetadata("integration_test", "true")
                                                         .build());
         assertEquals(charge, Charge.retrieve(charge.getId()));
 

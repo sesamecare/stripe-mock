@@ -23,6 +23,7 @@ public class RefundTest extends AbstractStripeMockTest {
         PaymentIntent paymentIntent = PaymentIntent.create(PaymentIntentCreateParams.builder()
                                                                                     .setAmount(10_00L)
                                                                                     .setCurrency("usd")
+                                                                                    .putMetadata("integration_test", "true")
                                                                                     .build());
         paymentIntent.confirm(PaymentIntentConfirmParams.builder()
                                                         .setPaymentMethod("pm_card_mastercard")
@@ -43,6 +44,7 @@ public class RefundTest extends AbstractStripeMockTest {
         PaymentIntent pi1 = PaymentIntent.create(PaymentIntentCreateParams.builder()
                                                                           .setAmount(10_00L)
                                                                           .setCurrency("usd")
+                                                                          .putMetadata("integration_test", "true")
                                                                           .build());
         pi1.confirm(PaymentIntentConfirmParams.builder()
                                               .setPaymentMethod("pm_card_mastercard")
@@ -51,6 +53,7 @@ public class RefundTest extends AbstractStripeMockTest {
         PaymentIntent pi2 = PaymentIntent.create(PaymentIntentCreateParams.builder()
                                                                           .setAmount(10_00L)
                                                                           .setCurrency("usd")
+                                                                          .putMetadata("integration_test", "true")
                                                                           .build());
         pi2.confirm(PaymentIntentConfirmParams.builder()
                                               .setPaymentMethod("pm_card_mastercard")
@@ -66,6 +69,7 @@ public class RefundTest extends AbstractStripeMockTest {
         IdempotencyException idempotencyException = assertThrows(IdempotencyException.class,
                                                                  () -> Refund.create(RefundCreateParams.builder()
                                                                                                        .setPaymentIntent(pi2.getId())
+                                                                                                       .putMetadata("integration_test", "true")
                                                                                                        .build(),
                                                                                      RequestOptions.builder()
                                                                                                    .setIdempotencyKey(idempotencyKey)
@@ -82,11 +86,13 @@ public class RefundTest extends AbstractStripeMockTest {
         PaymentIntent paymentIntent = PaymentIntent.create(PaymentIntentCreateParams.builder()
                                                                                     .setAmount(10_00L)
                                                                                     .setCurrency("usd")
+                                                                                    .putMetadata("integration_test", "true")
                                                                                     .build());
 
         InvalidRequestException invalidRequestException = assertThrows(InvalidRequestException.class,
                                                                        () -> Refund.create(RefundCreateParams.builder()
                                                                                                              .setPaymentIntent(paymentIntent.getId())
+                                                                                                             .putMetadata("integration_test", "true")
                                                                                                              .build()));
         assertEquals(String.format("This PaymentIntent (%s) does not have a successful charge to refund.", paymentIntent.getId()),
                      invalidRequestException.getStripeError()
@@ -101,6 +107,7 @@ public class RefundTest extends AbstractStripeMockTest {
         PaymentIntent paymentIntent = PaymentIntent.create(PaymentIntentCreateParams.builder()
                                                                                     .setAmount(10_00L)
                                                                                     .setCurrency("usd")
+                                                                                    .putMetadata("integration_test", "true")
                                                                                     .build());
         paymentIntent.confirm(PaymentIntentConfirmParams.builder()
                                                         .setPaymentMethod("pm_card_mastercard")
@@ -108,6 +115,7 @@ public class RefundTest extends AbstractStripeMockTest {
         Refund createdRefund = //
                 Refund.create(RefundCreateParams.builder()
                                                 .setPaymentIntent(paymentIntent.getId())
+                                                .putMetadata("integration_test", "true")
                                                 .setAmount(5_00L)
                                                 //.setOrigin(RefundCreateParams.Origin.CUSTOMER_BALANCE) // todo: origin is unsupported, or potentially only in combination with other settings
                                                 .setReason(RefundCreateParams.Reason.DUPLICATE)
@@ -165,6 +173,7 @@ public class RefundTest extends AbstractStripeMockTest {
         PaymentIntent p1 = PaymentIntent.create(PaymentIntentCreateParams.builder()
                                                                          .setAmount(10_00L)
                                                                          .setCurrency("usd")
+                                                                         .putMetadata("integration_test", "true")
                                                                          .build())
                                         .confirm(PaymentIntentConfirmParams.builder()
                                                                            .setPaymentMethod("pm_card_mastercard")
@@ -173,11 +182,13 @@ public class RefundTest extends AbstractStripeMockTest {
         Refund r1 = Refund.create(RefundCreateParams.builder()
                                                     .setPaymentIntent(p1.getId())
                                                     .setReason(RefundCreateParams.Reason.DUPLICATE)
+                                                    .putMetadata("integration_test", "true")
                                                     .build());
 
         PaymentIntent p2 = PaymentIntent.create(PaymentIntentCreateParams.builder()
                                                                          .setAmount(10_00L)
                                                                          .setCurrency("usd")
+                                                                         .putMetadata("integration_test", "true")
                                                                          .build())
                                         .confirm(PaymentIntentConfirmParams.builder()
                                                                            .setPaymentMethod("pm_card_mastercard")
@@ -187,11 +198,13 @@ public class RefundTest extends AbstractStripeMockTest {
                                                      .setAmount(1_00L)
                                                      .setPaymentIntent(p2.getId())
                                                      .setReason(RefundCreateParams.Reason.DUPLICATE)
+                                                     .putMetadata("integration_test", "true")
                                                      .build());
         Refund r22 = Refund.create(RefundCreateParams.builder()
                                                      .setAmount(2_00L)
                                                      .setPaymentIntent(p2.getId())
                                                      .setReason(RefundCreateParams.Reason.DUPLICATE)
+                                                     .putMetadata("integration_test", "true")
                                                      .build());
 
         List<Refund> rs1 = Refund.list(RefundListParams.builder()
@@ -220,6 +233,7 @@ public class RefundTest extends AbstractStripeMockTest {
         PaymentIntent paymentIntent = PaymentIntent.create(PaymentIntentCreateParams.builder()
                                                                                     .setAmount(10_00L)
                                                                                     .setCurrency("usd")
+                                                                                    .putMetadata("integration_test", "true")
                                                                                     .build());
         paymentIntent.confirm(PaymentIntentConfirmParams.builder()
                                                         .setPaymentMethod("pm_card_mastercard")
@@ -236,9 +250,11 @@ public class RefundTest extends AbstractStripeMockTest {
         Charge charge = Charge.create(ChargeCreateParams.builder()
                                                         .setAmount(10_00L)
                                                         .setCurrency("usd")
+                                                        .putMetadata("integration_test", "true")
                                                         .build());
         Refund refund = Refund.create(RefundCreateParams.builder()
                                                         .setCharge(charge.getId())
+                                                        .putMetadata("integration_test", "true")
                                                         .build());
         assertEquals("succeeded", refund.getStatus());
         Charge retrievedCharge = Charge.retrieve(charge.getId());
@@ -257,10 +273,12 @@ public class RefundTest extends AbstractStripeMockTest {
         Charge charge = Charge.create(ChargeCreateParams.builder()
                                                         .setAmount(10_00L)
                                                         .setCurrency("usd")
+                                                        .putMetadata("integration_test", "true")
                                                         .build());
         Refund refund1 = Refund.create(RefundCreateParams.builder()
                                                          .setCharge(charge.getId())
                                                          .setAmount(5_00L)
+                                                         .putMetadata("integration_test", "true")
                                                          .build());
         assertEquals("succeeded", refund1.getStatus());
         Charge retrievedCharge = Charge.retrieve(charge.getId());
@@ -277,6 +295,7 @@ public class RefundTest extends AbstractStripeMockTest {
         Refund refund2 = Refund.create(RefundCreateParams.builder()
                                                          .setCharge(charge.getId())
                                                          .setAmount(5_00L)
+                                                         .putMetadata("integration_test", "true")
                                                          .build());
         assertEquals("succeeded", refund2.getStatus());
         Charge retrievedCharge2 = Charge.retrieve(charge.getId());
@@ -293,5 +312,5 @@ public class RefundTest extends AbstractStripeMockTest {
                              .getAmount());
     }
 
-    // todo: test cancelling refunds
+    // todo: test cancelling refunds. How can they be in a state where we can even cancel them?
 }

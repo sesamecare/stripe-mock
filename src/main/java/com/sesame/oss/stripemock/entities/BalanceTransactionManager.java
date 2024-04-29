@@ -60,7 +60,9 @@ class BalanceTransactionManager extends AbstractEntityManager<BalanceTransaction
             add(Charge.class, balanceTransactions, query, null);
             add(Refund.class, balanceTransactions, query, null);
         }
-        balanceTransactions.sort(Comparator.comparing(BalanceTransaction::getCreated));
+        // Most recent first
+        balanceTransactions.sort(Comparator.comparing(BalanceTransaction::getCreated)
+                                           .reversed());
         return balanceTransactions;
     }
 
