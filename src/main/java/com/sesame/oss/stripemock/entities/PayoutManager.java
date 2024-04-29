@@ -2,6 +2,7 @@ package com.sesame.oss.stripemock.entities;
 
 import com.sesame.oss.stripemock.http.QueryParameters;
 import com.sesame.oss.stripemock.http.ResponseCodeException;
+import com.sesame.oss.stripemock.util.BalanceUtilities;
 import com.sesame.oss.stripemock.util.Utilities;
 import com.stripe.model.*;
 
@@ -56,13 +57,22 @@ class PayoutManager extends AbstractEntityManager<Payout> {
                     // todo: support other test accounts from stripe
                     payout.setStatus("failed");
                 } else {
-                    // todo: check that there are sufficient funds. If not, reject it.
                     payout.setStatus("paid");
+
+                    BalanceTransactionManager balanceTransactionEntityManager =
+                            (BalanceTransactionManager) stripeEntities.getEntityManager(BalanceTransaction.class);
+                    long sumAvailable = BalanceUtilities.sum(balanceTransactionEntityManager.list(null, stripeAccount), "available");
+                    if (sumAvailable <= payout.getAmount()) {
+                        throw new ResponseCodeException(400,
+                                                        "You have insufficient funds in your Stripe account for this transfer. Your card balance is too low.  You can use the /v1/balance endpoint to view your Stripe balance (for more details, see stripe.com/docs/api#balance).",
+                                                        "balance_insufficient",
+                                                        "invalid_request_error",
+                                                        null,
+                                                        null);
+                    }
 
                     payout.setBalanceTransaction(Utilities.randomIdWithPrefix("txn", 24));
                     // By registering this, it can be converted on the fly when expanded or fetched.
-                    BalanceTransactionManager balanceTransactionEntityManager =
-                            (BalanceTransactionManager) stripeEntities.getEntityManager(BalanceTransaction.class);
                     balanceTransactionEntityManager.register(payout.getBalanceTransaction(), payout);
                 }
 

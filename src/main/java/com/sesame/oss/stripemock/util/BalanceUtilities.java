@@ -50,12 +50,16 @@ public class BalanceUtilities {
     private static List<Balance.Available> createAvailable(List<BalanceTransaction> balanceTransactions) {
         Balance.Available available = new Balance.Available();
         available.setCurrency("USD");
-        available.setAmount(balanceTransactions.stream()
-                                               .filter(txn -> txn.getStatus()
-                                                                 .equals("available"))
-                                               .mapToLong(BalanceTransaction::getAmount)
-                                               .sum());
+        available.setAmount(sum(balanceTransactions, "available"));
         available.setSourceTypes(new Balance.Available.SourceTypes());
         return Collections.singletonList(available);
+    }
+
+    public static long sum(List<BalanceTransaction> balanceTransactions, String status) {
+        return balanceTransactions.stream()
+                                  .filter(txn -> txn.getStatus()
+                                                    .equals(status))
+                                  .mapToLong(BalanceTransaction::getAmount)
+                                  .sum();
     }
 }
