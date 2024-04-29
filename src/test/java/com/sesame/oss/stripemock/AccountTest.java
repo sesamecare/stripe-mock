@@ -120,13 +120,7 @@ public class AccountTest extends AbstractStripeMockTest {
     }
 
     public static Builder defaultCreationParametersBuilder(String companyName) {
-        Map<String, String> externalAccount = new HashMap<>();
-        externalAccount.put("object", "bank_account");
-        externalAccount.put("country", "US");
-        externalAccount.put("currency", "USD");
-        externalAccount.put("routing_number", "110000000");
-        externalAccount.put("account_number", "000123456789");
-        externalAccount.put("default_for_currency", "true");
+        Map<String, String> externalAccount = externalAccountData("000123456789", true);
 
         return AccountCreateParams.builder()
                                   .setCountry("US")
@@ -166,6 +160,17 @@ public class AccountTest extends AbstractStripeMockTest {
                                                                .build())
                                   .putExtraParam("external_account", externalAccount)
                                   .putMetadata("integration_test", "true");
+    }
+
+    public static Map<String, String> externalAccountData(String accountNumber, boolean defaultForCurrency) {
+        Map<String, String> externalAccount = new HashMap<>();
+        externalAccount.put("object", "bank_account");
+        externalAccount.put("country", "US");
+        externalAccount.put("currency", "USD");
+        externalAccount.put("routing_number", "110000000");
+        externalAccount.put("account_number", accountNumber);
+        externalAccount.put("default_for_currency", String.valueOf(defaultForCurrency));
+        return externalAccount;
     }
 
 }
