@@ -3,6 +3,7 @@ package com.sesame.oss.stripemock;
 import com.stripe.exception.IdempotencyException;
 import com.stripe.exception.InvalidRequestException;
 import com.stripe.exception.StripeException;
+import com.stripe.model.Charge;
 import com.stripe.model.PaymentIntent;
 import com.stripe.model.Refund;
 import com.stripe.net.RequestOptions;
@@ -14,8 +15,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class RefundTest extends AbstractStripeMockTest {
     @Test
@@ -230,4 +230,68 @@ public class RefundTest extends AbstractStripeMockTest {
                                                 .build());
         assertEquals(10_00L, createdRefund.getAmount());
     }
+
+    @Test
+    void shouldRefundACharge() throws StripeException {
+        Charge charge = Charge.create(ChargeCreateParams.builder()
+                                                        .setAmount(10_00L)
+                                                        .setCurrency("usd")
+                                                        .build());
+        Refund refund = Refund.create(RefundCreateParams.builder()
+                                                        .setCharge(charge.getId())
+                                                        .build());
+        assertEquals("succeeded", refund.getStatus());
+        Charge retrievedCharge = Charge.retrieve(charge.getId());
+        assertTrue(retrievedCharge.getRefunded());
+        assertEquals(10_00L, retrievedCharge.getAmountRefunded());
+        List<Refund> refunds = retrievedCharge.getRefunds()
+                                              .getData();
+        assertEquals(1, refunds.size());
+        assertEquals(10_00L,
+                     refunds.getFirst()
+                            .getAmount());
+    }
+
+    @Test
+    void shouldPartiallyRefundACharge() throws StripeException {
+        Charge charge = Charge.create(ChargeCreateParams.builder()
+                                                        .setAmount(10_00L)
+                                                        .setCurrency("usd")
+                                                        .build());
+        Refund refund1 = Refund.create(RefundCreateParams.builder()
+                                                         .setCharge(charge.getId())
+                                                         .setAmount(5_00L)
+                                                         .build());
+        assertEquals("succeeded", refund1.getStatus());
+        Charge retrievedCharge = Charge.retrieve(charge.getId());
+        assertFalse(retrievedCharge.getRefunded());
+        assertEquals(5_00L, retrievedCharge.getAmountRefunded());
+        List<Refund> refunds = retrievedCharge.getRefunds()
+                                              .getData();
+        assertEquals(1, refunds.size());
+        assertEquals(5_00L,
+                     refunds.getFirst()
+                            .getAmount());
+
+        // refund the last part so that it is fully refunded
+        Refund refund2 = Refund.create(RefundCreateParams.builder()
+                                                         .setCharge(charge.getId())
+                                                         .setAmount(5_00L)
+                                                         .build());
+        assertEquals("succeeded", refund2.getStatus());
+        Charge retrievedCharge2 = Charge.retrieve(charge.getId());
+        assertTrue(retrievedCharge2.getRefunded());
+        assertEquals(10_00L, retrievedCharge2.getAmountRefunded());
+        List<Refund> refunds2 = retrievedCharge2.getRefunds()
+                                                .getData();
+        assertEquals(2, refunds2.size());
+        assertEquals(5_00L,
+                     refunds2.getFirst()
+                             .getAmount());
+        assertEquals(5_00L,
+                     refunds2.getLast()
+                             .getAmount());
+    }
+
+    // todo: test cancelling refunds
 }

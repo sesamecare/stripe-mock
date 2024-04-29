@@ -3,8 +3,10 @@ package com.sesame.oss.stripemock.entities;
 import com.sesame.oss.stripemock.http.ResponseCodeException;
 import com.stripe.model.BalanceTransaction;
 import com.stripe.model.Charge;
+import com.stripe.model.RefundCollection;
 
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -31,6 +33,15 @@ class ChargeManager extends AbstractEntityManager<Charge> {
     @Override
     protected Charge initialize(Charge charge, Map<String, Object> formData, String stripeAccount) throws ResponseCodeException {
         charge.setRefunded(Boolean.FALSE);
+
+        RefundCollection refunds = new RefundCollection();
+        refunds.setObject("list");
+        refunds.setHasMore(false);
+        refunds.setData(new ArrayList<>());
+        refunds.setUrl("/v1/charges/" + charge.getId() + "/refunds");
+        charge.setRefunds(refunds);
+
+
         // todo: this can be pending and failed, too, and we should probably not let it succeed until we know that it will. But this will do for now.
         charge.setStatus("succeeded");
         // By registering this, it can be converted on the fly when expanded or fetched.

@@ -38,13 +38,22 @@ class RefundManager extends AbstractEntityManager<Refund> {
             Charge charge = stripeEntities.getEntityManager(Charge.class)
                                           .get(refund.getCharge(), stripeAccount)
                                           .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, "charge", refund.getCharge()));
-
+            charge.getRefunds()
+                  .getData()
+                  .add(refund);
             if (refund.getAmount() == null) {
                 refund.setAmount(charge.getAmount());
+                charge.setAmountRefunded(charge.getAmount());
                 charge.setRefunded(true);
             } else {
                 // Only fully refunded charges are marked as refunded
-                charge.setRefunded(Objects.equals(refund.getAmount(), charge.getAmount()));
+                long amountRefunded = charge.getRefunds()
+                                            .getData()
+                                            .stream()
+                                            .mapToLong(Refund::getAmount)
+                                            .sum();
+                charge.setRefunded(Objects.equals(amountRefunded, charge.getAmount()));
+                charge.setAmountRefunded(amountRefunded);
             }
         }
         // By registering this, it can be converted on the fly when expanded or fetched.
