@@ -62,7 +62,7 @@ class PayoutManager extends AbstractEntityManager<Payout> {
                     BalanceTransactionManager balanceTransactionEntityManager =
                             (BalanceTransactionManager) stripeEntities.getEntityManager(BalanceTransaction.class);
                     long sumAvailable = BalanceUtilities.sum(balanceTransactionEntityManager.list(null, stripeAccount), "available");
-                    if (sumAvailable <= payout.getAmount()) {
+                    if (sumAvailable < payout.getAmount()) {
                         throw new ResponseCodeException(400,
                                                         "You have insufficient funds in your Stripe account for this transfer. Your card balance is too low.  You can use the /v1/balance endpoint to view your Stripe balance (for more details, see stripe.com/docs/api#balance).",
                                                         "balance_insufficient",
