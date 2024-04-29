@@ -19,8 +19,6 @@ public final class BalanceTransactionMapper {
         };
     }
 
-    // todo: which of these amount should be negative? Does it depend on the stripe account context in which the call takes place?
-
     private static BalanceTransaction toBalanceTransaction(Refund refund, String stripeAccount) {
         if (stripeAccount != null) {
             throw new IllegalStateException("Should not request refund balance transactions when specifying a stripe connect account id");
@@ -73,7 +71,6 @@ public final class BalanceTransactionMapper {
         if (stripeAccount != null) {
             // The default direction of a payout is OUT from the connect account
             // Thus, if there is an account specified, the amount must be negative
-            // todo: what happens if there isn't a stripe account specified? Does this EVER show up? If so, what's the direction?
             amount = -amount;
         }
         BalanceTransaction balanceTransaction = new BalanceTransaction();
@@ -115,10 +112,6 @@ public final class BalanceTransactionMapper {
         balanceTransaction.setId(transfer.getBalanceTransaction());
         balanceTransaction.setObject("balance_transaction");
         balanceTransaction.setStatus("available");
-        // todo: this should apparently be 'payment', and the source object should be a charge? wtf?
-        //  How could the source be the charge? Why wouldn't that be the transfer?
-        //  Maybe it just looks like a charge. It's got an id like this: py_1P6VdeFVKnpiM7amROiLJQ2S
-        //  Those can't even be found in stripe. So maybe it's just the *format* of the data that's the charge
         balanceTransaction.setType("payment");
         Charge source = new Charge();
         source.setId(Utilities.randomIdWithPrefix("py", 24));

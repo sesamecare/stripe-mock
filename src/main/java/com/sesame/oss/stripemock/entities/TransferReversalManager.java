@@ -62,7 +62,6 @@ class TransferReversalManager extends AbstractEntityManager<TransferReversal> {
 
     @Override
     public List<TransferReversal> list(QueryParameters query, String stripeAccount) {
-        // todo: can the stripeAccount even be null here?
         return entities.values()
                        .stream()
                        .filter(transferReversal -> stripeAccount == null ||
@@ -72,29 +71,31 @@ class TransferReversalManager extends AbstractEntityManager<TransferReversal> {
 
     @Override
     public Optional<TransferReversal> get(String id, String stripeAccount, String parentEntityType, String parentEntityId) throws ResponseCodeException {
-        if (!parentEntityType.equals("transfers")) {
-            throw new UnsupportedOperationException("Transfer reversals can't be attached to things that are not transfers");
-        }
-        EntityManager<Transfer> transfersEntityManager = stripeEntities.getEntityManager(Transfer.class);
-        transfersEntityManager.get(parentEntityId, stripeAccount)
-                              .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, "transfers", parentEntityId));
-        // todo: verify that the parent-child relationship is valid
-
+        assertParentConnectionIsValid(id, stripeAccount, parentEntityType, parentEntityId);
         return Optional.ofNullable(entities.get(id));
     }
 
     @Override
     public Optional<TransferReversal> update(String id, Map<String, Object> formData, String stripeAccount, String parentEntityType, String parentEntityId)
             throws ResponseCodeException {
+        assertParentConnectionIsValid(id, stripeAccount, parentEntityType, parentEntityId);
+        return update(id, formData, stripeAccount);
+    }
+
+    private void assertParentConnectionIsValid(String id, String stripeAccount, String parentEntityType, String parentEntityId) throws ResponseCodeException {
         if (!parentEntityType.equals("transfers")) {
             throw new UnsupportedOperationException("Transfer reversals can't be attached to things that are not transfers");
         }
         EntityManager<Transfer> transfersEntityManager = stripeEntities.getEntityManager(Transfer.class);
-        transfersEntityManager.get(parentEntityId, stripeAccount)
-                              .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, "transfers", parentEntityId));
-        // todo: verify that the parent-child relationship is valid
-
-        return update(id, formData, stripeAccount);
+        Transfer parentTransfer = transfersEntityManager.get(parentEntityId, stripeAccount)
+                                                        .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, "transfers", parentEntityId));
+        if (parentTransfer.getReversals()
+                          .getData()
+                          .stream()
+                          .noneMatch(transferReversal -> transferReversal.getId()
+                                                                         .equals(id))) {
+            throw new ResponseCodeException(400, String.format("Reversal %s not connected to parent %s", id, parentEntityId));
+        }
     }
 
     private Transfer getTransferOrThrow(String stripeAccount, TransferReversal transferReversal) {

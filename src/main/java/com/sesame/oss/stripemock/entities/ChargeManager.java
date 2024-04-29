@@ -39,7 +39,6 @@ class ChargeManager extends AbstractEntityManager<Charge> {
         return super.initialize(charge, formData, stripeAccount);
     }
 
-    // todo: tests for Charge, including source
     // todo: there must be a corresponding charge for each payment intent.
     //  Are we going to store these or just fake them by looking up the payment intent?
     //  If the former, we should consider doing the same for balance transactions

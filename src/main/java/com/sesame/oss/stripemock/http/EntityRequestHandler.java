@@ -25,7 +25,7 @@ class EntityRequestHandler {
             // but for now, it's just for balances
             List<BalanceTransaction> balanceTransactions = stripeEntities.getEntityManager(BalanceTransaction.class)
                                                                          .list(query, stripeAccount);
-            return new EntityResponse.Single(200, BalanceUtilities.createBalance(balanceTransactions));
+            return new EntityResponse.Single(200, BalanceUtilities.createBalance(balanceTransactions, stripeAccount));
         }
         EntityManager<?> entityManager = stripeEntities.getEntityManager(path[2]);
         return switch (method) {

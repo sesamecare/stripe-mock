@@ -34,6 +34,8 @@ public class AccountTest extends AbstractStripeMockTest {
         a1.delete();
     }
 
+    // todo: add test for attaching an external (bank) account when creating the account
+
     // todo: tests for missing type: com.stripe.exception.InvalidRequestException: Missing required param: type.; code: parameter_missing
     // todo: tests: com.stripe.exception.InvalidRequestException: The `business_type` must be provided when sending either of `individual` or `company` parameters.
 

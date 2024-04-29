@@ -74,8 +74,6 @@ class BalanceTransactionManager extends AbstractEntityManager<BalanceTransaction
         }
     }
 
-    // todo: tests for BalanceTransaction
-
     @Override
     public boolean canPerformOperation(String operation) {
         return operation.equals("search");

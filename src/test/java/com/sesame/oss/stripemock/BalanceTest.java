@@ -8,6 +8,8 @@ import com.stripe.param.BalanceRetrieveParams;
 import org.junit.jupiter.api.Test;
 
 import static com.sesame.oss.stripemock.AccountTest.defaultCreationParameters;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 public class BalanceTest extends AbstractStripeMockTest {
     @Test
@@ -18,104 +20,71 @@ public class BalanceTest extends AbstractStripeMockTest {
                                            RequestOptions.builder()
                                                          .setStripeAccount(createdAccount.getId())
                                                          .build());
-        /*
-        Defaults with nothing in it:
 
-        {
-          "available": [
-            {
-              "amount": 0,
-              "currency": "usd",
-              "source_types": {
-                "bank_account": null,
-                "card": 0,
-                "fpx": null
-              }
-            }
-          ],
-          "connect_reserved": null,
-          "instant_available": [
-            {
-              "amount": 0,
-              "currency": "usd",
-              "source_types": {
-                "bank_account": null,
-                "card": 0,
-                "fpx": null
-              }
-            }
-          ],
-          "issuing": null,
-          "livemode": false,
-          "object": "balance",
-          "pending": [
-            {
-              "amount": 0,
-              "currency": "usd",
-              "source_types": {
-                "bank_account": null,
-                "card": 0,
-                "fpx": null
-              }
-            }
-          ]
-        }
-         */
-        System.out.println("balance = " + balance);
+        assertEquals(1,
+                     balance.getAvailable()
+                            .size());
+        assertEquals(0,
+                     balance.getAvailable()
+                            .getFirst()
+                            .getAmount());
+
+        assertNull(balance.getConnectReserved());
+
+        assertEquals(1,
+                     balance.getInstantAvailable()
+                            .size());
+        assertEquals(0,
+                     balance.getInstantAvailable()
+                            .getFirst()
+                            .getAmount());
+
+        assertEquals(1,
+                     balance.getPending()
+                            .size());
+        assertEquals(0,
+                     balance.getPending()
+                            .getFirst()
+                            .getAmount());
+
+        assertEquals("balance", balance.getObject());
     }
 
     @Test
     void shouldFetchEmptyBalanceForMainAccount() throws StripeException {
         Balance balance = Balance.retrieve();
-        /*
-        Defaults with nothing in it:
+        assertEquals(1,
+                     balance.getAvailable()
+                            .size());
+        assertEquals(0,
+                     balance.getAvailable()
+                            .getFirst()
+                            .getAmount());
 
-        {
-          "available": [
-            {
-              "amount": 15766637,
-              "currency": "usd",
-              "source_types": {
-                "bank_account": null,
-                "card": 15766637,
-                "fpx": null
-              }
-            }
-          ],
-          "connect_reserved": [
-            {
-              "amount": 12649356,
-              "currency": "usd",
-              "source_types": null
-            }
-          ],
-          "instant_available": [
-            {
-              "amount": 1000000,
-              "currency": "usd",
-              "source_types": {
-                "bank_account": null,
-                "card": 1000000,
-                "fpx": null
-              }
-            }
-          ],
-          "issuing": null,
-          "livemode": false,
-          "object": "balance",
-          "pending": [
-            {
-              "amount": 863489,
-              "currency": "usd",
-              "source_types": {
-                "bank_account": null,
-                "card": 863489,
-                "fpx": null
-              }
-            }
-          ]
-        }
-         */
-        System.out.println("balance = " + balance);
+        assertEquals(1,
+                     balance.getConnectReserved()
+                            .size());
+        assertEquals(0,
+                     balance.getConnectReserved()
+                            .getFirst()
+                            .getAmount());
+
+        assertEquals(1,
+                     balance.getInstantAvailable()
+                            .size());
+        assertEquals(0,
+                     balance.getInstantAvailable()
+                            .getFirst()
+                            .getAmount());
+
+        assertEquals(1,
+                     balance.getPending()
+                            .size());
+        assertEquals(0,
+                     balance.getPending()
+                            .getFirst()
+                            .getAmount());
+
+        assertEquals("balance", balance.getObject());
     }
 }

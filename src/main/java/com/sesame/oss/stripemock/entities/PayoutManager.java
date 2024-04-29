@@ -30,11 +30,6 @@ class PayoutManager extends AbstractEntityManager<Payout> {
 
     @Override
     protected Payout initialize(Payout payout, Map<String, Object> formData, String stripeAccount) throws ResponseCodeException {
-
-        // todo: why is there a 'destination' value on the payout when the actual destination is specified un the request options?
-        //  Are both actually supported?
-        //  Apparently you use destination to specify an explicit bank account, whereas otherwise I guess it'll use the default/only account?
-        //  If not specified, it's the default for the specified currency
         Account account = stripeEntities.getEntityManager(Account.class)
                                         .get(stripeAccount, null)
                                         .orElseThrow(() -> ResponseCodeException.noSuchEntity(404, "account", stripeAccount));
@@ -43,6 +38,7 @@ class PayoutManager extends AbstractEntityManager<Payout> {
                                                         .getData();
         // todo: find account by currency or throw
         // todo: find account by payout destination, if provided, or throw
+        // todo: support specifying the destination in the payout object. If not present, we'll use the default for the specified currency
 
         payout.setStatus("pending");
         payout.setAutomatic(false);
@@ -53,12 +49,11 @@ class PayoutManager extends AbstractEntityManager<Payout> {
             ExternalAccount targetAccount = externalAccounts.getFirst();
             if (targetAccount instanceof BankAccount bankAccount) {
 
-                // todo: make sure it fails when this is the account: 000111111113
-                //  Also support other test accounts from stripe
                 BankAccountManager bankAccountEntityManager = (BankAccountManager) stripeEntities.getEntityManager(BankAccount.class);
                 // todo: clean this whole thing up
                 if ("000111111113".equals(bankAccountEntityManager.getAccountNumber(bankAccount.getId())
                                                                   .orElseThrow())) {
+                    // todo: support other test accounts from stripe
                     payout.setStatus("failed");
                 } else {
                     // todo: check that there are sufficient funds. If not, reject it.
@@ -69,8 +64,6 @@ class PayoutManager extends AbstractEntityManager<Payout> {
                     BalanceTransactionManager balanceTransactionEntityManager =
                             (BalanceTransactionManager) stripeEntities.getEntityManager(BalanceTransaction.class);
                     balanceTransactionEntityManager.register(payout.getBalanceTransaction(), payout);
-
-
                 }
 
                 // todo: handle bank accounts like payment methods. Make sure they get their own id, and then look up that id to see what behavior we should use.
@@ -117,15 +110,12 @@ class PayoutManager extends AbstractEntityManager<Payout> {
         } else {
             // todo: what happens if we do a payout if there is no bank account or card?
         }
-
-
         return super.initialize(payout, formData, stripeAccount);
     }
 
     @Override
     public List<Payout> list(QueryParameters query, String stripeAccount) {
         if (stripeAccount == null) {
-            // todo: should this be allowed to happen? How does stripe handle this?
             return entities.values()
                            .stream()
                            .toList();
@@ -139,6 +129,4 @@ class PayoutManager extends AbstractEntityManager<Payout> {
         super.clear();
         byStripeAccount.clear();
     }
-
-    // todo: tests for Payout, including source
 }

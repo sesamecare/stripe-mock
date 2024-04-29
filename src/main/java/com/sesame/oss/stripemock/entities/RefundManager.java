@@ -29,7 +29,7 @@ class RefundManager extends AbstractEntityManager<Refund> {
                                                         .orElseThrow(() -> ResponseCodeException.noSuchEntity(400,
                                                                                                               "payment_intent",
                                                                                                               refund.getPaymentIntent()));
-            // todo: this should get the charge and set refunded=true on the charge
+            // todo: this should get the charge and set refunded=true|false on the charge
             if (refund.getAmount() == null) {
                 refund.setAmount(paymentIntent.getAmount());
             }
