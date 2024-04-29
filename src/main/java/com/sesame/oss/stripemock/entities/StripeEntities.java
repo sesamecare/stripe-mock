@@ -29,8 +29,12 @@ public class StripeEntities {
         add(new CustomerManager(clock, this));
         add(new InvoiceManager(clock, this));
         add(new InvoiceItemManager(clock, this));
+        add(new ChargeManager(clock, this));
+        add(new PayoutManager(clock, this));
+        add(new BalanceTransactionManager(clock, this));
+        add(new BankAccountManager(clock, this));
         add(new ProductManager(clock));
-        add(new AccountManager(clock));
+        add(new AccountManager(clock, this));
     }
 
     private void add(EntityManager<?> entityManager) {
@@ -74,7 +78,7 @@ public class StripeEntities {
 
     private static Object safeGet(String id, EntityManager<?> entityManager) {
         try {
-            return entityManager.get(id)
+            return entityManager.get(id, null)
                                 .orElse(null);
         } catch (ResponseCodeException e) {
             // We have to do this, rather than just rely on the optional, as each entity is able to throw a custom exception.

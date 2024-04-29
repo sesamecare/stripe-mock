@@ -43,7 +43,7 @@ class IdempotencyManager {
                             return response;
                         } catch (Throwable e) {
                             RawResponse response = new RawResponse(500,
-                                                                   Utilities.toApiError(e.getMessage(), null, null, null),
+                                                                   Utilities.toApiError(e.getMessage(), null, null, null, null),
                                                                    Utilities.defaultHeaders(idempotencyKey, requestId),
                                                                    requestId);
                             newRequest.setResponse(response);

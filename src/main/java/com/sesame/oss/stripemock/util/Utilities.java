@@ -10,7 +10,6 @@ import com.stripe.model.*;
 import com.stripe.net.ApiResource;
 import com.sun.net.httpserver.Headers;
 
-import java.util.List;
 import java.util.Random;
 
 public class Utilities {
@@ -81,7 +80,7 @@ public class Utilities {
         return headers;
     }
 
-    public static String toApiError(String message, String code, String type, String declineCode) {
+    public static String toApiError(String message, String code, String type, String param, String declineCode) {
         String sanitizedMessage;
         if (message != null) {
             sanitizedMessage = message.replaceAll("\"", "\\\\\"")
@@ -89,25 +88,18 @@ public class Utilities {
         } else {
             sanitizedMessage = "";
         }
-        return PRODUCER_GSON.toJson(new StripeError(new StripeError.Error(sanitizedMessage, code, type, declineCode)));
+        return PRODUCER_GSON.toJson(new StripeError(new StripeError.Error(sanitizedMessage, code, type, param, declineCode)));
     }
 
     public static String toApiError(ResponseCodeException e) {
-        return toApiError(e.getMessage(), e.getCode(), e.getErrorType(), e.getDeclineCode());
-    }
-
-    public record StripeList<T>(List<T> data,
-                                boolean hasMore) {
-        public String getObject() {
-            // used by GSON
-            return "list";
-        }
+        return toApiError(e.getMessage(), e.getCode(), e.getErrorType(), e.getParam(), e.getDeclineCode());
     }
 
     public record StripeError(Error error) {
         public record Error(String message,
                             String code,
                             String type,
+                            String param,
                             String declineCode) {
 
         }

@@ -35,29 +35,37 @@ class JsonResponseProducer {
         }
     }
 
-    String toJson(List<?> values, Map<String, Object> requestBodyFormData, QueryParameters queryParameters) throws ResponseCodeException {
+    String toJson(List<?> values, Map<String, Object> requestBodyFormData, QueryParameters queryParameters, String url) throws ResponseCodeException {
         if (values == null) {
             //language=json
-            return """
-                   {
-                    "type": "list",
-                    "data": []
-                   }
-                   """;
+            return String.format("""
+                                 {
+                                  "object": "list",
+                                  "url": "%s",
+                                  "has_more": false,
+                                  "total_count": 0,
+                                  "data": []
+                                 }
+                                 """, url);
         } else {
             List<String> expandPaths = getExpandPaths(requestBodyFormData, queryParameters);
+            JsonObject root = new JsonObject();
+            root.addProperty("object", "list");
+            root.addProperty("has_more", false);
+            root.addProperty("url", url);
+            root.addProperty("total_count", values.size());
+            JsonArray data = new JsonArray();
+            root.add("data", data);
             if (expandPaths.isEmpty()) {
-                return Utilities.PRODUCER_GSON.toJson(new Utilities.StripeList<>(values, false));
+                for (Object value : values) {
+                    data.add(Utilities.PRODUCER_GSON.toJsonTree(value));
+                }
             } else {
-                JsonObject root = new JsonObject();
-                root.addProperty("type", "list");
-                JsonArray data = new JsonArray();
-                root.add("data", data);
                 for (Object value : values) {
                     data.add(expand(value, expandPaths));
                 }
-                return Utilities.PRODUCER_GSON.toJson(root);
             }
+            return Utilities.PRODUCER_GSON.toJson(root);
         }
     }
 
@@ -69,23 +77,65 @@ class JsonResponseProducer {
             JsonObject parent = root;
             for (int i = 0; i < pathParts.length; i++) {
                 String pathPart = pathParts[i];
+                if (i == 0 && "data".equals(pathPart)) {
+                    // This is really only if this is a list, but afaik know other root level elements contain a 'data' field, so this is fine for now.
+                    continue;
+                }
                 JsonElement expandableFieldIdOrNull = parent.remove(pathPart);
                 if (expandableFieldIdOrNull == null) {
+                    if ("data".equals(pathParts[0])) {
+                        // It seems like this is lenient when dealing with lists.
+                        // For balance transactions, when the list contains a mix of things, Stripe will simply ignore
+                        // fields that don't exist in the underlying source.
+                        // See com.sesame.oss.stripemock.BalanceTransactionTest.shouldListWithExpansions
+                        break;
+                    }
                     throw new ResponseCodeException(400,
                                                     String.format("This property cannot be expanded (%s).",
                                                                   Arrays.stream(pathParts)
                                                                         .limit(i + 1)
                                                                         .collect(Collectors.joining("."))));
                 }
-                String expandableFieldId = expandableFieldIdOrNull.getAsString();
-                Object entity = stripeEntities.getEntityById(expandableFieldId)
-                                              .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, pathPart, expandableFieldId));
-                JsonElement expandedObject = Utilities.PRODUCER_GSON.toJsonTree(entity);
+                JsonElement expandedObject;
+                if (expandableFieldIdOrNull.isJsonObject()) {
+                    JsonObject expandableField = expandableFieldIdOrNull.getAsJsonObject();
+                    if (isList(expandableField)) {
+                        JsonArray data = expandableField.getAsJsonArray("data");
+                        if (data.isEmpty()) {
+                            // We currently have the lists right in the main object for all our entities.
+                            // While that might change in the future, for now we can actually just return the list itself.
+                            // If it's empty when we get here, it'll be empty in the object too.
+                            // We should keep this branch, though, to make it clear what the distinction is in the future.
+                            expandedObject = expandableField;
+                        } else {
+                            // This was already full of data and expanded, so restore the state
+                            expandedObject = expandableField;
+                        }
+                    } else {
+                        // todo: what do we actually need to do here?
+                        expandedObject = expandableField;
+                    }
+                } else {
+                    String expandableFieldId = expandableFieldIdOrNull.getAsString();
+                    Object entity = stripeEntities.getEntityById(expandableFieldId)
+                                                  .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, pathPart, expandableFieldId));
+
+                    expandedObject = Utilities.PRODUCER_GSON.toJsonTree(entity);
+                }
                 parent.add(pathPart, expandedObject);
                 parent = expandedObject.getAsJsonObject();
             }
         }
         return root;
+    }
+
+    private boolean isList(JsonObject object) {
+        return object.has("object") &&
+               object.getAsJsonPrimitive("object")
+                     .isString() &&
+               object.getAsJsonPrimitive("object")
+                     .getAsString()
+                     .equals("list");
     }
 
     private List<String> getExpandPaths(Map<String, Object> requestBodyFormData, QueryParameters queryParameters) {

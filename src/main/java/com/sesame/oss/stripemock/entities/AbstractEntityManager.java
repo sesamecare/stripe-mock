@@ -35,13 +35,16 @@ abstract class AbstractEntityManager<T extends ApiResource & HasId> implements E
     }
 
     @Override
-    public T add(Map<String, Object> formData, String parentEntityType, String parentEntityId) throws ResponseCodeException {
+    public T add(Map<String, Object> formData, String stripeAccount, String parentEntityType, String parentEntityId) throws ResponseCodeException {
         // Most entities do not support related sub-entities, so this is a reasonable default
-        throw new UnsupportedOperationException("Entity does not support sub-entities");
+        throw new UnsupportedOperationException(String.format("Entity %s does not support sub-entities. Attempted to add under parent %s/%s",
+                                                              getNormalizedEntityName(),
+                                                              parentEntityType,
+                                                              parentEntityId));
     }
 
     @Override
-    public T add(Map<String, Object> formData) throws ResponseCodeException {
+    public T add(Map<String, Object> formData, String stripeAccount) throws ResponseCodeException {
         // They give us form data, so this is a ghetto way to turn it back into an object.
 
         // We're the only ones that are allowed to specify what the id should be
@@ -60,7 +63,7 @@ abstract class AbstractEntityManager<T extends ApiResource & HasId> implements E
                             .getEpochSecond());
         ensureFormDataSpecifiesObjectType(formData);
 
-        T entity = initialize(parse(formData), formData);
+        T entity = initialize(parse(formData), formData, stripeAccount);
         validate(entity);
         T existing = entities.putIfAbsent(id, entity);
         if (existing != null) {
@@ -72,7 +75,7 @@ abstract class AbstractEntityManager<T extends ApiResource & HasId> implements E
     }
 
     @Override
-    public final Optional<T> perform(String id, String operation, Map<String, Object> formData) throws ResponseCodeException {
+    public final Optional<T> perform(String id, String operation, Map<String, Object> formData, String stripeAccount) throws ResponseCodeException {
         T existingEntity = entities.get(id);
         if (existingEntity == null) {
             return Optional.empty();
@@ -85,23 +88,60 @@ abstract class AbstractEntityManager<T extends ApiResource & HasId> implements E
         validate(postOperationEntity);
         entities.put(id, postOperationEntity);
         // For now, there's nothing to do here. In reality we'd do stuff like trigger webhooks etc.
-        return Optional.of(newEntity);
+        return Optional.of(postOperationEntity);
     }
 
     @Override
-    public Optional<T> update(String id, Map<String, Object> formData) throws ResponseCodeException {
-        return perform(id, MAGIC_UPDATE_OPERATION, formData);
+    public Optional<T> perform(String id, String operation, Map<String, Object> formData, String stripeAccount, String parentEntityType, String parentEntityId)
+            throws ResponseCodeException {
+        // Most entities do not support related sub-entities, so this is a reasonable default
+        throw new UnsupportedOperationException(String.format("Entity %s does not support sub-entities. Attempted to perform operation %s under parent %s/%s",
+                                                              getNormalizedEntityName(),
+                                                              operation,
+                                                              parentEntityType,
+                                                              parentEntityId));
     }
 
     @Override
-    public Optional<T> get(String id) throws ResponseCodeException {
+    public Optional<T> update(String id, Map<String, Object> formData, String stripeAccount) throws ResponseCodeException {
+        return perform(id, MAGIC_UPDATE_OPERATION, formData, stripeAccount);
+    }
+
+    @Override
+    public Optional<T> update(String id, Map<String, Object> formData, String stripeAccount, String parentEntityType, String parentEntityId)
+            throws ResponseCodeException {
+        // Most entities do not support related sub-entities, so this is a reasonable default
+        throw new UnsupportedOperationException(String.format("Entity %s does not support sub-entities. Attempted to update under parent %s/%s",
+                                                              getNormalizedEntityName(),
+                                                              parentEntityType,
+                                                              parentEntityId));
+    }
+
+    @Override
+    public Optional<T> get(String id, String stripeAccount) throws ResponseCodeException {
         return Optional.ofNullable(entities.get(id));
     }
 
     @Override
-    public List<T> list(QueryParameters query) {
-        // In the future we might try some reflection-based search here, but for now, let's let each entity manager handle its own listing
-        return Collections.emptyList();
+    public Optional<T> get(String id, String stripeAccount, String parentEntityType, String parentEntityId) throws ResponseCodeException {
+        // Most entities do not support related sub-entities, so this is a reasonable default
+        throw new UnsupportedOperationException("Entity does not support sub-entities");
+    }
+
+    @Override
+    public List<T> list(QueryParameters query, String stripeAccount) throws ResponseCodeException {
+        return entities.values()
+                       .stream()
+                       .toList();
+    }
+
+    @Override
+    public List<T> list(QueryParameters query, String stripeAccount, String parentEntityType, String parentEntityId) throws ResponseCodeException {
+        // Most entities do not support related sub-entities, so this is a reasonable default
+        throw new UnsupportedOperationException(String.format("Entity %s does not support sub-entities. Attempted to list under parent %s/%s",
+                                                              getNormalizedEntityName(),
+                                                              parentEntityType,
+                                                              parentEntityId));
     }
 
     /**
@@ -112,6 +152,16 @@ abstract class AbstractEntityManager<T extends ApiResource & HasId> implements E
     public Optional<T> delete(String id) throws ResponseCodeException {
         // This shouldn't happen, as API classes that can't be deleted won't have a .delete() method on them.
         throw new ResponseCodeException(405, "Cannot delete");
+    }
+
+    @Override
+    public Optional<T> delete(String id, String stripeAccount, String parentEntityType, String parentEntityId) throws ResponseCodeException {
+        // Most entities do not support related sub-entities, so this is a reasonable default
+        // Most entities do not support related sub-entities, so this is a reasonable default
+        throw new UnsupportedOperationException(String.format("Entity %s does not support sub-entities. Attempted to delete under parent %s/%s",
+                                                              getNormalizedEntityName(),
+                                                              parentEntityType,
+                                                              parentEntityId));
     }
 
     @Override
@@ -148,11 +198,12 @@ abstract class AbstractEntityManager<T extends ApiResource & HasId> implements E
      * This means that the entity can be augmented, but also rejected if the state is inconsistent.
      * By default, this method does nothing.
      *
-     * @param entity   the new entity
-     * @param formData the data used to create the entity
+     * @param entity        the new entity
+     * @param formData      the data used to create the entity
+     * @param stripeAccount the stripe connect account for the request
      * @implNote his method does <b>not</b> exist on the {@link EntityManager} interface, as it is an implementation detail, and should never be called from the outside.
      */
-    protected T initialize(T entity, Map<String, Object> formData) throws ResponseCodeException {
+    protected T initialize(T entity, Map<String, Object> formData, String stripeAccount) throws ResponseCodeException {
         return entity;
     }
 

@@ -13,7 +13,7 @@ class SetupIntentManager extends AbstractEntityManager<SetupIntent> {
     }
 
     @Override
-    protected SetupIntent initialize(SetupIntent setupIntent, Map<String, Object> formData) throws ResponseCodeException {
+    protected SetupIntent initialize(SetupIntent setupIntent, Map<String, Object> formData, String stripeAccount) throws ResponseCodeException {
         setupIntent.setClientSecret(setupIntent.getId() + "_secret_" + Utilities.randomStringOfLength(25));
         setupIntent.setStatus("requires_payment_method");
         return setupIntent;

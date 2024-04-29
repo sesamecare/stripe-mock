@@ -2,14 +2,20 @@ package com.sesame.oss.stripemock.entities;
 
 import com.sesame.oss.stripemock.http.ResponseCodeException;
 import com.stripe.model.Account;
+import com.stripe.model.BankAccount;
+import com.stripe.model.ExternalAccountCollection;
 
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
 
 class AccountManager extends AbstractEntityManager<Account> {
-    protected AccountManager(Clock clock) {
+    private final StripeEntities stripeEntities;
+
+    protected AccountManager(Clock clock, StripeEntities stripeEntities) {
         super(clock, Account.class, "acct", 24);
+        this.stripeEntities = stripeEntities;
     }
 
     @Override
@@ -24,8 +30,28 @@ class AccountManager extends AbstractEntityManager<Account> {
     }
 
     @Override
-    public Optional<Account> get(String id) throws ResponseCodeException {
-        Optional<Account> account = super.get(id);
+    protected Account initialize(Account account, Map<String, Object> formData, String stripeAccount) throws ResponseCodeException {
+        ExternalAccountCollection externalAccounts = new ExternalAccountCollection();
+        externalAccounts.setObject("list");
+        externalAccounts.setHasMore(false);
+        externalAccounts.setData(new ArrayList<>());
+        externalAccounts.setUrl("/v1/accounts/" + account.getId() + "/external_accounts");
+        account.setExternalAccounts(externalAccounts);
+
+        Map<String, Object> externalAccountFormData = (Map<String, Object>) formData.get("external_account");
+        if (externalAccountFormData != null) {
+            BankAccount bankAccount = stripeEntities.getEntityManager(BankAccount.class)
+                                                    .add(externalAccountFormData, stripeAccount);
+            bankAccount.setAccount(account.getId());
+            externalAccounts.getData()
+                            .add(bankAccount);
+        }
+        return super.initialize(account, formData, stripeAccount);
+    }
+
+    @Override
+    public Optional<Account> get(String id, String stripeAccount) throws ResponseCodeException {
+        Optional<Account> account = super.get(id, stripeAccount);
         if (account.isEmpty()) {
             // Accounts are special like this, in that they return a 403 instead of a 404
             throw new ResponseCodeException(403,
@@ -34,6 +60,7 @@ class AccountManager extends AbstractEntityManager<Account> {
                                                     id),
                                             "account_invalid",
                                             "invalid_request_error",
+                                            null,
                                             null);
         }
         return account;

@@ -18,14 +18,14 @@ class CustomerManager extends AbstractEntityManager<Customer> {
     }
 
     @Override
-    protected Customer initialize(Customer customer, Map<String, Object> formData) throws ResponseCodeException {
+    protected Customer initialize(Customer customer, Map<String, Object> formData, String stripeAccount) throws ResponseCodeException {
         setDefaultSourceIfNecessary(customer, formData);
         customer.setDelinquent(false);
         customer.setInvoicePrefix(Utilities.randomStringOfLength(8)
                                            .toUpperCase());
         customer.setNextInvoiceSequence(1L);
         customer.setTaxExempt("none");
-        return super.initialize(customer, formData);
+        return super.initialize(customer, formData, stripeAccount);
     }
 
     @Override
@@ -34,7 +34,7 @@ class CustomerManager extends AbstractEntityManager<Customer> {
         Customer.InvoiceSettings invoiceSettings = customer.getInvoiceSettings();
         if (invoiceSettings != null && invoiceSettings.getDefaultPaymentMethod() != null) {
             stripeEntities.getEntityManager(PaymentMethod.class)
-                          .get(invoiceSettings.getDefaultPaymentMethod())
+                          .get(invoiceSettings.getDefaultPaymentMethod(), null)
                           .filter(pm -> pm.getCustomer() != null &&
                                         pm.getCustomer()
                                           .equals(customer.getId()))
@@ -46,7 +46,7 @@ class CustomerManager extends AbstractEntityManager<Customer> {
                                                                        entityId),
                                                                "resource_missing",
                                                                "invalid_request_error",
-                                                               null);
+                                                               null, null);
                           });
         }
 
@@ -61,6 +61,7 @@ class CustomerManager extends AbstractEntityManager<Customer> {
                                             "You passed an empty string for 'default_source'. We assume empty values are an attempt to unset a parameter; however 'default_source' cannot be unset. You should remove 'default_source' from your request or supply a non-empty value.",
                                             "parameter_invalid_empty",
                                             "invalid_request_error",
+                                            null,
                                             null);
         }
 

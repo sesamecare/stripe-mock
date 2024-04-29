@@ -11,7 +11,6 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 class PaymentMethodManager extends AbstractEntityManager<PaymentMethod> {
     // todo: test methods for things like charge_declined etc
@@ -27,6 +26,8 @@ class PaymentMethodManager extends AbstractEntityManager<PaymentMethod> {
     public void bootstrap() {
         try {
             // todo: more
+            bootstrapTestCard("tok_bypassPending", "pm_card_bypassPending");
+            bootstrapTestCard("tok_bypassPending", "tok_bypassPending");
             bootstrapTestCard("tok_chargeCustomerFail", "pm_card_chargeCustomerFail");
             bootstrapTestCard("tok_chargeCustomerFail", "tok_chargeCustomerFail");
             bootstrapTestCard("tok_visa_chargeDeclined", "pm_card_visa_chargeDeclined");
@@ -50,11 +51,11 @@ class PaymentMethodManager extends AbstractEntityManager<PaymentMethod> {
         Map<String, Object> metadata = new HashMap<>();
         formData.put("metadata", metadata);
         metadata.put(StripeMock.OVERRIDE_ID_FOR_TESTING, id);
-        add(formData);
+        add(formData, null);
     }
 
     @Override
-    protected PaymentMethod initialize(PaymentMethod paymentMethod, Map<String, Object> formData) throws ResponseCodeException {
+    protected PaymentMethod initialize(PaymentMethod paymentMethod, Map<String, Object> formData, String stripeAccount) throws ResponseCodeException {
         if ("card".equals(paymentMethod.getType())) {
             PaymentMethod.Card card = paymentMethod.getCard();
 
@@ -91,6 +92,15 @@ class PaymentMethodManager extends AbstractEntityManager<PaymentMethod> {
                     card.setLast4("0341");
                     card.setExpMonth((long) today.getMonthValue());
                     card.setExpYear((long) (today.getYear() + 1));
+                } else if ("tok_bypassPending".equals(token)) {
+                    // The US charge succeeds. Funds are added directly to your available balance, bypassing your pending balance.
+                    // https://docs.stripe.com/testing?testing-method=tokens#available-balance
+                    card.setBrand("visa");
+                    card.setCountry("US");
+                    card.setFunding("credit");
+                    card.setLast4("0077");
+                    card.setExpMonth((long) today.getMonthValue());
+                    card.setExpYear((long) (today.getYear() + 1));
                 } else if ("tok_visa_chargeDeclined".equals(token)) {
                     // todo: disallow this from being attached to a customer
                     card.setBrand("visa");
@@ -106,7 +116,7 @@ class PaymentMethodManager extends AbstractEntityManager<PaymentMethod> {
             }
         }
 
-        return super.initialize(paymentMethod, formData);
+        return super.initialize(paymentMethod, formData, stripeAccount);
     }
 
     @Override
@@ -114,7 +124,7 @@ class PaymentMethodManager extends AbstractEntityManager<PaymentMethod> {
         String customerId = paymentMethod.getCustomer();
         if (customerId != null) {
             stripeEntities.getEntityManager(Customer.class)
-                          .get(customerId)
+                          .get(customerId, null)
                           .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, "customer", customerId));
         }
     }
@@ -138,7 +148,7 @@ class PaymentMethodManager extends AbstractEntityManager<PaymentMethod> {
     }
 
     @Override
-    public List<PaymentMethod> list(QueryParameters query) {
+    public List<PaymentMethod> list(QueryParameters query, String stripeAccount) {
 
         return entities.values()
                        .stream()
@@ -162,7 +172,7 @@ class PaymentMethodManager extends AbstractEntityManager<PaymentMethod> {
             }
             case "visa" -> {
                 if (last4.equals("0341") || last4.equals("0002")) {
-                    throw new ResponseCodeException(402, "Your card was declined.", "card_declined", null, "generic_decline");
+                    throw new ResponseCodeException(402, "Your card was declined.", "card_declined", null, "generic_decline", null);
                 }
                 if (!last4.equals("4242")) {
                     throw new ResponseCodeException(400, "Invalid card");

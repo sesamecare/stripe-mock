@@ -101,37 +101,42 @@ public class StripeApiHttpHandler implements HttpHandler {
 
 
                                          // This is only called if we didn't already have a response for this request+idempotency key
-                                         Headers headers = Utilities.defaultHeaders(idempotencyKey, requestId);
+                                         Headers responseHeaders = Utilities.defaultHeaders(idempotencyKey, requestId);
                                          try {
                                              Map<String, Object> requestBodyFormData =
                                                      parser.parseRequestBody(requestBody, requestHeaders.getFirst("Content-Type"));
-                                             EntityResponse response = requestHandler.handleRequest(method, path, queryParameters, requestBodyFormData);
+                                             EntityResponse response =
+                                                     requestHandler.handleRequest(method, path, queryParameters, requestHeaders, requestBodyFormData);
                                              return switch (response) {
                                                  case Single(int code, Object entity) -> new RawResponse(code,
                                                                                                          jsonResponseProducer.toJson(entity,
                                                                                                                                      requestBodyFormData,
                                                                                                                                      queryParameters),
-                                                                                                         headers,
+                                                                                                         responseHeaders,
                                                                                                          requestId);
                                                  case Multiple(int code, List<?> entities) -> new RawResponse(code,
                                                                                                               jsonResponseProducer.toJson(entities,
                                                                                                                                           requestBodyFormData,
-                                                                                                                                          queryParameters),
-                                                                                                              headers,
+                                                                                                                                          queryParameters,
+                                                                                                                                          requestURI.getPath()),
+                                                                                                              responseHeaders,
                                                                                                               requestId);
                                              };
                                          } catch (ResponseCodeException e) {
-                                             return new RawResponse(e.getResponseCode(), Utilities.toApiError(e), headers, requestId);
+                                             return new RawResponse(e.getResponseCode(), Utilities.toApiError(e), responseHeaders, requestId);
                                          } catch (Throwable e) {
                                              Logger.getLogger("stripe-mock")
                                                    .log(Level.SEVERE, "Could not process response", e);
-                                             return new RawResponse(500, Utilities.toApiError(e.getMessage(), null, null, null), headers, requestId);
+                                             return new RawResponse(500,
+                                                                    Utilities.toApiError(e.getMessage(), null, null, null, null),
+                                                                    responseHeaders,
+                                                                    requestId);
                                          }
                                      });
         } catch (Throwable e) {
             Logger.getLogger("stripe-mock")
                   .log(Level.SEVERE, "Could not process request", e);
-            return new RawResponse(500, Utilities.toApiError(e.getMessage(), null, null, null), Utilities.defaultHeaders(null, requestId), requestId);
+            return new RawResponse(500, Utilities.toApiError(e.getMessage(), null, null, null, null), Utilities.defaultHeaders(null, requestId), requestId);
         }
     }
 

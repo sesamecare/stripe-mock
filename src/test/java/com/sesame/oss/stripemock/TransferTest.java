@@ -1,12 +1,15 @@
 package com.sesame.oss.stripemock;
 
 import com.stripe.exception.IdempotencyException;
+import com.stripe.exception.InvalidRequestException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Account;
 import com.stripe.model.Transfer;
+import com.stripe.model.TransferCollection;
 import com.stripe.model.TransferReversal;
 import com.stripe.net.RequestOptions;
 import com.stripe.param.TransferCreateParams;
+import com.stripe.param.TransferListParams;
 import com.stripe.param.TransferReversalCollectionCreateParams;
 import com.stripe.param.TransferUpdateParams;
 import org.junit.jupiter.api.Test;
@@ -17,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 public class TransferTest extends AbstractStripeMockTest {
     @Test
     void shouldGetTheSameResponseForIdempotentRequests() throws StripeException {
-        Account account = Account.create(defaultCreationParameters("Company name"));
+        Account account = Account.create(defaultCreationParameters("Stripe-mock test company name"));
         TransferCreateParams input = TransferCreateParams.builder()
                                                          .setAmount(10_000L)
                                                          .setCurrency("USD")
@@ -33,7 +36,7 @@ public class TransferTest extends AbstractStripeMockTest {
 
     @Test
     void shouldNotBeAbleToCreateDifferentEntitiesUsingTheSameIdempotencyKey() throws StripeException {
-        Account account = Account.create(defaultCreationParameters("Company name"));
+        Account account = Account.create(defaultCreationParameters("Stripe-mock test company name"));
         String idempotencyKey = String.valueOf(Math.random());
         Transfer.create(TransferCreateParams.builder()
                                             .setAmount(10_00L)
@@ -59,12 +62,70 @@ public class TransferTest extends AbstractStripeMockTest {
                                          .getMessage());
     }
 
+    @Test
+    void shouldRejectTransfersWithoutADestination() {
+        InvalidRequestException exception = assertThrows(InvalidRequestException.class,
+                                                         () -> Transfer.create(TransferCreateParams.builder()
+                                                                                                   .setAmount(9_000L)
+                                                                                                   .setCurrency("usd")
+                                                                                                   .putMetadata("integration_test", "true")
+                                                                                                   .setTransferGroup("my transfer group")
+                                                                                                   .setSourceType(TransferCreateParams.SourceType.CARD)
+                                                                                                   .setDescription("my description")
+                                                                                                   .build()));
+        assertEquals("destination", exception.getParam());
+    }
+
+    @Test
+    void shouldExpandReversalsWhenListingIfRequested() throws StripeException {
+        Account account = Account.create(defaultCreationParameters("Stripe-mock test company name"));
+        Transfer createdTransfer = //
+                Transfer.create(TransferCreateParams.builder()
+                                                    .setAmount(9_000L)
+                                                    .setCurrency("usd")
+                                                    .putMetadata("integration_test", "true")
+                                                    .setTransferGroup("my transfer group")
+                                                    .setSourceType(TransferCreateParams.SourceType.CARD)
+                                                    .setDescription("my description")
+                                                    .setDestination(account.getId())
+                                                    .build());
+
+        TransferCollection transfersBeforeReversals = Transfer.list(TransferListParams.builder()
+                                                                                      .setDestination(account.getId())
+                                                                                      .setLimit(100L)
+                                                                                      .addExpand("data.reversals")
+                                                                                      .build());
+        assertTrue(transfersBeforeReversals.getData()
+                                           .getFirst()
+                                           .getReversals()
+                                           .getData()
+                                           .isEmpty());
+
+        TransferReversal transferReversal = createdTransfer.getReversals()
+                                                           .create(TransferReversalCollectionCreateParams.builder()
+                                                                                                         .build());
+
+        TransferCollection transfersAfterReversals = Transfer.list(TransferListParams.builder()
+                                                                                     .setDestination(account.getId())
+                                                                                     .setLimit(100L)
+                                                                                     .addExpand("data.reversals")
+                                                                                     .build());
+        // Make sure it's actually expanded, and we're not just getting the id.
+        assertEquals(transferReversal.getAmount(),
+                     transfersAfterReversals.getData()
+                                            .getFirst()
+                                            .getReversals()
+                                            .getData()
+                                            .getFirst()
+                                            .getAmount());
+    }
+
     // todo: tests for missing destination, with error: com.stripe.exception.InvalidRequestException: Missing required param: destination.; code: parameter_missing
     // todo: test: com.stripe.exception.InvalidRequestException: Missing required param: currency.; code: parameter_missing
 
     @Test
     void testTransfer() throws Exception {
-        Account account = Account.create(defaultCreationParameters("Company name"));
+        Account account = Account.create(defaultCreationParameters("Stripe-mock test company name"));
         Transfer createdTransfer = //
                 Transfer.create(TransferCreateParams.builder()
                                                     .setAmount(9_000L)
@@ -103,11 +164,12 @@ public class TransferTest extends AbstractStripeMockTest {
                                               .getData()
                                               .size());
 
+
     }
 
     @Test
     void shouldCreatePartialTransferReversals() throws StripeException {
-        Account account = Account.create(defaultCreationParameters("Company name"));
+        Account account = Account.create(defaultCreationParameters("Stripe-mock test company name"));
         Transfer createdTransfer = //
                 Transfer.create(TransferCreateParams.builder()
                                                     .setAmount(10_00L)

@@ -22,7 +22,7 @@ class InvoiceManager extends AbstractEntityManager<Invoice> {
     }
 
     @Override
-    protected Invoice initialize(Invoice invoice, Map<String, Object> formData) throws ResponseCodeException {
+    protected Invoice initialize(Invoice invoice, Map<String, Object> formData, String stripeAccount) throws ResponseCodeException {
         invoice.setStatus("draft");
         invoice.setPaid(false);
 
@@ -41,7 +41,7 @@ class InvoiceManager extends AbstractEntityManager<Invoice> {
 
         // These are always defaulted and are not affected by inputs
         Customer customer = stripeEntities.getEntityManager(Customer.class)
-                                          .get(invoice.getCustomer())
+                                          .get(invoice.getCustomer(), stripeAccount)
                                           .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, "customer", invoice.getCustomer()));
         invoice.setAccountCountry("US");
         invoice.setAccountName("Stripe-mock");
@@ -73,7 +73,7 @@ class InvoiceManager extends AbstractEntityManager<Invoice> {
         lines.setUrl("/v1/invoices/" + invoice.getId() + "/lines");
         invoice.setLines(lines);
 
-        return super.initialize(invoice, formData);
+        return super.initialize(invoice, formData, stripeAccount);
     }
 
     @Override

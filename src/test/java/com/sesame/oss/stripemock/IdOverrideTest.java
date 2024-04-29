@@ -20,7 +20,7 @@ public class IdOverrideTest extends AbstractStripeMockTest {
     @Test
     void shouldSupportOverridingAccountId() throws StripeException {
         Account createdAccount = //
-                Account.create(defaultCreationParametersBuilder("Company name").putMetadata(StripeMock.OVERRIDE_ID_FOR_TESTING, "acct_abc123")
+                Account.create(defaultCreationParametersBuilder("Stripe-mock test company name").putMetadata(StripeMock.OVERRIDE_ID_FOR_TESTING, "acct_abc123")
                                                                                .build());
         assertEquals("acct_abc123", createdAccount.getId());
     }
@@ -150,7 +150,7 @@ public class IdOverrideTest extends AbstractStripeMockTest {
 
     @Test
     void shouldSupportOverridingTransferId() throws StripeException {
-        Account account = Account.create(defaultCreationParameters("Company name"));
+        Account account = Account.create(defaultCreationParameters("Stripe-mock test company name"));
         Transfer createdTransfer = //
                 Transfer.create(TransferCreateParams.builder()
                                                     .setAmount(9_000L)

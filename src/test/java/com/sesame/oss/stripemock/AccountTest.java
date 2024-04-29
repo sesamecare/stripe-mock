@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
 public class AccountTest extends AbstractStripeMockTest {
     @Test
     void shouldGetTheSameResponseForIdempotentRequests() throws StripeException {
-        AccountCreateParams input = defaultCreationParameters("Company name");
+        AccountCreateParams input = defaultCreationParameters("Stripe-mock test company name");
         RequestOptions options = RequestOptions.builder()
                                                .setIdempotencyKey(String.valueOf(Math.random()))
                                                .build();
@@ -40,7 +40,7 @@ public class AccountTest extends AbstractStripeMockTest {
     @Test
     void shouldNotBeAbleToCreateDifferentEntitiesUsingTheSameIdempotencyKey() throws StripeException {
         String idempotencyKey = String.valueOf(Math.random());
-        Account account = Account.create(defaultCreationParameters("Company name"),
+        Account account = Account.create(defaultCreationParameters("Stripe-mock test company name"),
                                          RequestOptions.builder()
                                                        .setIdempotencyKey(idempotencyKey)
                                                        .build());
@@ -60,7 +60,7 @@ public class AccountTest extends AbstractStripeMockTest {
     @Test
     void testAccount() throws Exception {
         Account createdAccount = //
-                Account.create(defaultCreationParameters("Company name"));
+                Account.create(defaultCreationParameters("Stripe-mock test company name"));
 
         Account retrievedAccount = Account.retrieve(createdAccount.getId());
         assertEquals(createdAccount, retrievedAccount);

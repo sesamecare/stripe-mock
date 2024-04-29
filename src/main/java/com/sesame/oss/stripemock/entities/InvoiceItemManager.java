@@ -20,17 +20,17 @@ class InvoiceItemManager extends AbstractEntityManager<InvoiceItem> {
     }
 
     @Override
-    protected InvoiceItem initialize(InvoiceItem invoiceItem, Map<String, Object> formData) throws ResponseCodeException {
+    protected InvoiceItem initialize(InvoiceItem invoiceItem, Map<String, Object> formData, String stripeAccount) throws ResponseCodeException {
         String invoiceId = invoiceItem.getInvoice();
         if (invoiceId != null) {
             Invoice invoice = stripeEntities.getEntityManager(Invoice.class)
-                                            .get(invoiceId)
+                                            .get(invoiceId, stripeAccount)
                                             .orElseThrow(() -> ResponseCodeException.noSuchEntity(404, "invoice", invoiceId));
             invoice.getLines()
                    .getData()
                    .add(convertToLineItem(invoiceItem));
         }
-        return super.initialize(invoiceItem, formData);
+        return super.initialize(invoiceItem, formData, stripeAccount);
     }
 
     private InvoiceLineItem convertToLineItem(InvoiceItem invoiceItem) {

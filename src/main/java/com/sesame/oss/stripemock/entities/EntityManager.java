@@ -11,19 +11,31 @@ import java.util.Map;
 import java.util.Optional;
 
 public interface EntityManager<T extends ApiResource & HasId> {
-    public T add(Map<String, Object> formData, String parentEntityType, String parentEntityId) throws ResponseCodeException;
+    public T add(Map<String, Object> formData, String stripeAccount, String parentEntityType, String parentEntityId) throws ResponseCodeException;
 
-    public T add(Map<String, Object> formData) throws ResponseCodeException;
+    public T add(Map<String, Object> formData, String stripeAccount) throws ResponseCodeException;
 
-    public Optional<T> perform(String id, String operation, Map<String, Object> formData) throws ResponseCodeException;
+    public Optional<T> perform(String id, String operation, Map<String, Object> formData, String stripeAccount) throws ResponseCodeException;
 
-    public Optional<T> update(String id, Map<String, Object> formData) throws ResponseCodeException;
+    public Optional<T> perform(String id, String operation, Map<String, Object> formData, String stripeAccount, String parentEntityType, String parentEntityId)
+            throws ResponseCodeException;
 
-    public Optional<T> get(String id) throws ResponseCodeException;
+    public Optional<T> update(String id, Map<String, Object> formData, String stripeAccount) throws ResponseCodeException;
 
-    public List<T> list(QueryParameters query);
+    public Optional<T> update(String id, Map<String, Object> formData, String stripeAccount, String parentEntityType, String parentEntityId)
+            throws ResponseCodeException;
+
+    public Optional<T> get(String id, String stripeAccount) throws ResponseCodeException;
+
+    public Optional<T> get(String id, String stripeAccount, String parentEntityType, String parentEntityId) throws ResponseCodeException;
+
+    public List<T> list(QueryParameters query, String stripeAccount) throws ResponseCodeException;
+
+    public List<T> list(QueryParameters query, String stripeAccount, String parentEntityType, String parentEntityId) throws ResponseCodeException;
 
     public Optional<T> delete(String id) throws ResponseCodeException;
+
+    public Optional<T> delete(String id, String stripeAccount, String parentEntityType, String parentEntityId) throws ResponseCodeException;
 
     public void clear();
 
@@ -44,7 +56,7 @@ public interface EntityManager<T extends ApiResource & HasId> {
      * or a different entity, like in {@code /v1/transfers/tr_abc123/reversals}.
      *
      * @param operation the operation, such as "confirm" and "reversals" from the examples.
-     * @return whether calling {@link #perform(String, String, Map)} with this operation is supported or not
+     * @return whether calling {@link #perform(String, String, Map, String)} with this operation is supported or not
      */
     public boolean canPerformOperation(String operation);
 }

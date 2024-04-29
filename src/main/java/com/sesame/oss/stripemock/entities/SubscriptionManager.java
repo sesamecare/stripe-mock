@@ -20,20 +20,20 @@ class SubscriptionManager extends AbstractEntityManager<Subscription> {
     }
 
     @Override
-    protected Subscription initialize(Subscription subscription, Map<String, Object> formData) throws ResponseCodeException {
+    protected Subscription initialize(Subscription subscription, Map<String, Object> formData, String stripeAccount) throws ResponseCodeException {
         if (subscription.getCustomer() == null) {
             throw new ResponseCodeException(400, "Missing required param: customer.");
         }
         String id = subscription.getCustomer();
         stripeEntities.getEntityManager(Customer.class)
-                      .get(id)
+                      .get(id, stripeAccount)
                       .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, "customer", subscription.getCustomer()));
 
         Map<String, Object> invoiceParameters = new HashMap<>();
         invoiceParameters.put("subscription", subscription.getId());
         invoiceParameters.put("customer", subscription.getCustomer());
         EntityManager<Invoice> invoiceEntityManager = stripeEntities.getEntityManager(Invoice.class);
-        Invoice firstInvoice = invoiceEntityManager.add(invoiceParameters);
+        Invoice firstInvoice = invoiceEntityManager.add(invoiceParameters, stripeAccount);
         for (SubscriptionItem subscriptionItem : subscription.getItems()
                                                              .getData()) {
             subscriptionItem.setId(Utilities.randomIdWithPrefix("si", 24));
@@ -44,7 +44,7 @@ class SubscriptionManager extends AbstractEntityManager<Subscription> {
         }
         // invoices that are part of a subscription are automatically finalized, meaning that they can't change.
         // This moves them from 'draft' to 'open'
-        firstInvoice = invoiceEntityManager.perform(firstInvoice.getId(), "finalize", new HashMap<>())
+        firstInvoice = invoiceEntityManager.perform(firstInvoice.getId(), "finalize", new HashMap<>(), stripeAccount)
                                            .orElseThrow();
 
 
@@ -67,7 +67,7 @@ class SubscriptionManager extends AbstractEntityManager<Subscription> {
                                               .orElseThrow());
         paymentIntentFormData.put("customer", subscription.getCustomer());
         PaymentIntent invoicePaymentIntent = stripeEntities.getEntityManager(PaymentIntent.class)
-                                                           .add(paymentIntentFormData);
+                                                           .add(paymentIntentFormData, stripeAccount);
         firstInvoice.setPaymentIntent(invoicePaymentIntent.getId());
         invoicePaymentIntent.setInvoice(firstInvoice.getId());
 
@@ -75,7 +75,7 @@ class SubscriptionManager extends AbstractEntityManager<Subscription> {
         subscription.setCancelAtPeriodEnd(false);
         subscription.setLatestInvoice(firstInvoice.getId());
         subscription.setStatus("incomplete");
-        return super.initialize(subscription, formData);
+        return super.initialize(subscription, formData, stripeAccount);
     }
 
     private InvoiceLineItem toInvoiceLineItem(SubscriptionItem subscriptionItem) {

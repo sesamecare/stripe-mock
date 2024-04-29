@@ -18,7 +18,7 @@ class PaymentIntentManager extends AbstractEntityManager<PaymentIntent> {
     }
 
     @Override
-    protected PaymentIntent initialize(PaymentIntent paymentIntent, Map<String, Object> formData) throws ResponseCodeException {
+    protected PaymentIntent initialize(PaymentIntent paymentIntent, Map<String, Object> formData, String stripeAccount) throws ResponseCodeException {
         paymentIntent.setClientSecret(paymentIntent.getId() + "_secret_" + Utilities.randomStringOfLength(25));
         paymentIntent.setStatus("requires_payment_method");
         if (paymentIntent.getCaptureMethod() == null) {
@@ -51,7 +51,7 @@ class PaymentIntentManager extends AbstractEntityManager<PaymentIntent> {
         String customer = paymentIntent.getCustomer();
         if (customer != null) {
             stripeEntities.getEntityManager(Customer.class)
-                          .get(customer)
+                          .get(customer, null)
                           .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, "customer", customer));
         }
         String paymentMethodId = paymentIntent.getPaymentMethod();
@@ -74,7 +74,7 @@ class PaymentIntentManager extends AbstractEntityManager<PaymentIntent> {
      */
     private PaymentMethod getPaymentMethodForCustomerOrThrow(String paymentMethod, String customer) throws ResponseCodeException {
         return stripeEntities.getEntityManager(PaymentMethod.class)
-                             .get(paymentMethod)
+                             .get(paymentMethod, null)
                              .filter(pm -> pm.getCustomer() == null || Objects.equals(pm.getCustomer(), customer))
                              .orElseThrow(() -> new ResponseCodeException(400,
                                                                           String.format(
@@ -100,7 +100,7 @@ class PaymentIntentManager extends AbstractEntityManager<PaymentIntent> {
                             // todo: test that we throw if the customer is wrong
                             String id = updatedPaymentIntent.getCustomer();
                             Customer customer = stripeEntities.getEntityManager(Customer.class)
-                                                              .get(id)
+                                                              .get(id, null)
                                                               .orElseThrow(() -> ResponseCodeException.noSuchEntity(400,
                                                                                                                     "customer",
                                                                                                                     updatedPaymentIntent.getCustomer()));
@@ -118,7 +118,7 @@ class PaymentIntentManager extends AbstractEntityManager<PaymentIntent> {
                                                                         customer.getId()),
                                                                 "payment_intent_unexpected_state",
                                                                 null,
-                                                                null);
+                                                                null, null);
                             }
                         }
                     } else {
@@ -137,13 +137,13 @@ class PaymentIntentManager extends AbstractEntityManager<PaymentIntent> {
                     if (updatedPaymentIntent.getInvoice() != null) {
                         String invoiceId = updatedPaymentIntent.getInvoice();
                         Invoice invoice = stripeEntities.getEntityManager(Invoice.class)
-                                                        .get(invoiceId)
+                                                        .get(invoiceId, null)
                                                         .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, "invoice", invoiceId));
                         invoice.setStatus("paid");
                         if (invoice.getSubscription() != null) {
                             String subscriptionId = invoice.getSubscription();
                             stripeEntities.getEntityManager(Subscription.class)
-                                          .get(subscriptionId)
+                                          .get(subscriptionId, null)
                                           .orElseThrow(() -> ResponseCodeException.noSuchEntity(400, "subscription", subscriptionId))
                                           .setStatus("active");
                         }
@@ -186,7 +186,7 @@ class PaymentIntentManager extends AbstractEntityManager<PaymentIntent> {
                     // todo: alternatively consider a default set of expand paths for each object type
                     String id = updatedPaymentIntent.getCustomer();
                     updatedPaymentIntent.setCustomerObject(stripeEntities.getEntityManager(Customer.class)
-                                                                         .get(id)
+                                                                         .get(id, null)
                                                                          .orElseThrow(() -> ResponseCodeException.noSuchEntity(400,
                                                                                                                                "customer",
                                                                                                                                updatedPaymentIntent.getCustomer())));
