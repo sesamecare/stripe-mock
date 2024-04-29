@@ -4,6 +4,8 @@ import com.stripe.exception.IdempotencyException;
 import com.stripe.exception.PermissionException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Account;
+import com.stripe.model.BankAccount;
+import com.stripe.model.ExternalAccount;
 import com.stripe.net.RequestOptions;
 import com.stripe.param.AccountCreateParams;
 import com.stripe.param.AccountCreateParams.*;
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -34,7 +37,6 @@ public class AccountTest extends AbstractStripeMockTest {
         a1.delete();
     }
 
-    // todo: add test for attaching an external (bank) account when creating the account
 
     // todo: tests for missing type: com.stripe.exception.InvalidRequestException: Missing required param: type.; code: parameter_missing
     // todo: tests: com.stripe.exception.InvalidRequestException: The `business_type` must be provided when sending either of `individual` or `company` parameters.
@@ -66,6 +68,13 @@ public class AccountTest extends AbstractStripeMockTest {
 
         Account retrievedAccount = Account.retrieve(createdAccount.getId());
         assertEquals(createdAccount, retrievedAccount);
+
+        List<ExternalAccount> externalAccounts = retrievedAccount.getExternalAccounts()
+                                                                 .getData();
+        assertEquals(1, externalAccounts.size());
+        BankAccount bankAccount = (BankAccount) externalAccounts.getFirst();
+        assertEquals(createdAccount.getId(), bankAccount.getAccount());
+        assertEquals("bank_account", bankAccount.getObject());
 
         Account updatedAccount = //
                 retrievedAccount.update(AccountUpdateParams.builder()
