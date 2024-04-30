@@ -9,12 +9,10 @@ import java.time.Clock;
 import java.util.*;
 
 class BalanceTransactionManager extends AbstractEntityManager<BalanceTransaction> {
-    private final Map<String, BalanceTransactionSource> sourcesByBalanceTransactionId = new HashMap<>();
-    private final StripeEntities stripeEntities;
+    private final Map<String, String> sourcesByBalanceTransactionId = new HashMap<>();
 
     BalanceTransactionManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, BalanceTransaction.class, "txn", 24);
-        this.stripeEntities = stripeEntities;
+        super(stripeEntities, clock, BalanceTransaction.class, "txn", 24);
     }
 
     @Override
@@ -35,13 +33,13 @@ class BalanceTransactionManager extends AbstractEntityManager<BalanceTransaction
     @Override
     public Optional<BalanceTransaction> get(String id, String stripeAccount) throws ResponseCodeException {
         return Optional.ofNullable(sourcesByBalanceTransactionId.get(id))
-                       .map(source -> BalanceTransactionMapper.toBalanceTransaction(source, stripeAccount));
+                       .flatMap(stripeEntities::getEntityById)
+                       .map(source -> BalanceTransactionMapper.toBalanceTransaction((BalanceTransactionSource) source, stripeAccount));
     }
 
     void register(String id, BalanceTransactionSource balanceTransactionSource) {
-        sourcesByBalanceTransactionId.put(id, balanceTransactionSource);
+        sourcesByBalanceTransactionId.put(id, balanceTransactionSource.getId());
     }
-
 
     @Override
     public List<BalanceTransaction> list(QueryParameters query, String stripeAccount) throws ResponseCodeException {

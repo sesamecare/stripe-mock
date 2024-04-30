@@ -8,8 +8,8 @@ import java.time.Clock;
 import java.util.Map;
 
 class SetupIntentManager extends AbstractEntityManager<SetupIntent> {
-    protected SetupIntentManager(Clock clock) {
-        super(clock, SetupIntent.class, "seti", 24);
+    protected SetupIntentManager(Clock clock, StripeEntities stripeEntities) {
+        super(stripeEntities, clock, SetupIntent.class, "seti", 24);
     }
 
     @Override

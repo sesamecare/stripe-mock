@@ -14,11 +14,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 class TransferReversalManager extends AbstractEntityManager<TransferReversal> {
-    private final StripeEntities stripeEntities;
-
     protected TransferReversalManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, TransferReversal.class, "trr", 24);
-        this.stripeEntities = stripeEntities;
+        super(stripeEntities, clock, TransferReversal.class, "trr", 24);
     }
 
     @Override
@@ -41,6 +38,7 @@ class TransferReversalManager extends AbstractEntityManager<TransferReversal> {
         parentTransfer.getReversals()
                       .getData()
                       .add(transferReversal);
+        stripeEntities.bindChildToParentCollection(Transfer.class, parentTransfer.getId(), "getReversals", transferReversal.getId());
         long totalAmountReversed = parentTransfer.getReversals()
                                                  .getData()
                                                  .stream()

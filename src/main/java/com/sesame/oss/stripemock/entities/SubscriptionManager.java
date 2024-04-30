@@ -12,11 +12,8 @@ import java.util.Map;
 import java.util.Optional;
 
 class SubscriptionManager extends AbstractEntityManager<Subscription> {
-    private final StripeEntities stripeEntities;
-
     SubscriptionManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, Subscription.class, "sub", 24);
-        this.stripeEntities = stripeEntities;
+        super(stripeEntities, clock, Subscription.class, "sub", 24);
     }
 
     @Override
@@ -41,6 +38,7 @@ class SubscriptionManager extends AbstractEntityManager<Subscription> {
             firstInvoice.getLines()
                         .getData()
                         .add(toInvoiceLineItem(subscriptionItem));
+            stripeEntities.bindChildToParentCollection(Invoice.class, firstInvoice.getId(), "getLines", subscriptionItem.getId());
         }
         // invoices that are part of a subscription are automatically finalized, meaning that they can't change.
         // This moves them from 'draft' to 'open'

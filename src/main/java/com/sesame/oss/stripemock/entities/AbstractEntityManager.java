@@ -21,13 +21,15 @@ abstract class AbstractEntityManager<T extends ApiResource & HasId> implements E
      */
     protected static final String MAGIC_UPDATE_OPERATION = "__update";
     protected final Map<String, T> entities = new HashMap<>();
+    protected final StripeEntities stripeEntities;
     protected final Clock clock;
 
     private final Class<T> entityClass;
     private final String idPrefix;
     private final int idLength;
 
-    protected AbstractEntityManager(Clock clock, Class<T> entityClass, String idPrefix, int idLength) {
+    protected AbstractEntityManager(StripeEntities stripeEntities, Clock clock, Class<T> entityClass, String idPrefix, int idLength) {
+        this.stripeEntities = stripeEntities;
         this.clock = clock;
         this.entityClass = entityClass;
         this.idPrefix = idPrefix;
@@ -87,6 +89,8 @@ abstract class AbstractEntityManager<T extends ApiResource & HasId> implements E
         T postOperationEntity = perform(existingEntity, newEntity, operation, formData);
         validate(postOperationEntity);
         entities.put(id, postOperationEntity);
+        stripeEntities.updateLists(postOperationEntity);
+
         // For now, there's nothing to do here. In reality we'd do stuff like trigger webhooks etc.
         return Optional.of(postOperationEntity);
     }
@@ -156,7 +160,6 @@ abstract class AbstractEntityManager<T extends ApiResource & HasId> implements E
 
     @Override
     public Optional<T> delete(String id, String stripeAccount, String parentEntityType, String parentEntityId) throws ResponseCodeException {
-        // Most entities do not support related sub-entities, so this is a reasonable default
         // Most entities do not support related sub-entities, so this is a reasonable default
         throw new UnsupportedOperationException(String.format("Entity %s does not support sub-entities. Attempted to delete under parent %s/%s",
                                                               getNormalizedEntityName(),

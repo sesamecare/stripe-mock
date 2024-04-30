@@ -11,11 +11,8 @@ import java.util.Map;
 import java.util.Optional;
 
 class AccountManager extends AbstractEntityManager<Account> {
-    private final StripeEntities stripeEntities;
-
     protected AccountManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, Account.class, "acct", 24);
-        this.stripeEntities = stripeEntities;
+        super(stripeEntities, clock, Account.class, "acct", 24);
     }
 
     @Override
@@ -45,6 +42,7 @@ class AccountManager extends AbstractEntityManager<Account> {
             bankAccount.setAccount(account.getId());
             externalAccounts.getData()
                             .add(bankAccount);
+            stripeEntities.bindChildToParentCollection(Account.class, account.getId(), "getExternalAccounts", bankAccount.getId());
         }
         return super.initialize(account, formData, stripeAccount);
     }

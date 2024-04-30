@@ -11,11 +11,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 class ChargeManager extends AbstractEntityManager<Charge> {
-    private final StripeEntities stripeEntities;
-
     ChargeManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, Charge.class, "ch", 24);
-        this.stripeEntities = stripeEntities;
+        super(stripeEntities, clock, Charge.class, "ch", 24);
     }
 
     @Override

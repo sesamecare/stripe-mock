@@ -15,11 +15,8 @@ import java.util.Map;
 class PaymentMethodManager extends AbstractEntityManager<PaymentMethod> {
     // todo: test methods for things like charge_declined etc
 
-    private final StripeEntities stripeEntities;
-
     PaymentMethodManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, PaymentMethod.class, "pm", 24);
-        this.stripeEntities = stripeEntities;
+        super(stripeEntities, clock, PaymentMethod.class, "pm", 24);
     }
 
     @Override

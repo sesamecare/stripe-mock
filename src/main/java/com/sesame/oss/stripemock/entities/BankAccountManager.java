@@ -10,11 +10,9 @@ import java.util.*;
 
 class BankAccountManager extends AbstractEntityManager<BankAccount> {
     private final Map<String, String> providedBankAccountNumbers = new HashMap<>();
-    private final StripeEntities stripeEntities;
 
     BankAccountManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, BankAccount.class, "ba", 24);
-        this.stripeEntities = stripeEntities;
+        super(stripeEntities, clock, BankAccount.class, "ba", 24);
     }
 
     @Override
@@ -32,6 +30,7 @@ class BankAccountManager extends AbstractEntityManager<BankAccount> {
         parentAccount.getExternalAccounts()
                      .getData()
                      .add(bankAccount);
+        stripeEntities.bindChildToParentCollection(Account.class, parentAccount.getId(), "getExternalAccounts", bankAccount.getId());
         return bankAccount;
     }
 
@@ -79,6 +78,7 @@ class BankAccountManager extends AbstractEntityManager<BankAccount> {
         parentAccount.getExternalAccounts()
                      .getData()
                      .remove(bankAccount);
+        stripeEntities.unbindChildFromParentCollection(Account.class, parentAccount.getId(), "getExternalAccounts", bankAccount.getId());
 
         bankAccount.setDeleted(true);
         return Optional.of(bankAccount);

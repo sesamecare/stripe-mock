@@ -7,25 +7,20 @@ import com.sesame.oss.stripemock.util.Utilities;
 import com.stripe.model.*;
 
 import java.time.Clock;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 class PayoutManager extends AbstractEntityManager<Payout> {
-    private final Map<String, List<Payout>> byStripeAccount = new HashMap<>();
-    private final StripeEntities stripeEntities;
+    private final Map<String, Set<String>> stripeAccountToPayoutId = new HashMap<>();
 
     PayoutManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, Payout.class, "po", 24);
-        this.stripeEntities = stripeEntities;
+        super(stripeEntities, clock, Payout.class, "po", 24);
     }
 
     @Override
     public Payout add(Map<String, Object> formData, String stripeAccount) throws ResponseCodeException {
         Payout payout = super.add(formData, stripeAccount);
-        byStripeAccount.computeIfAbsent(stripeAccount, ignored -> new ArrayList<>())
-                       .add(payout);
+        stripeAccountToPayoutId.computeIfAbsent(stripeAccount, ignored -> new HashSet<>())
+                               .add(payout.getId());
         return payout;
     }
 
@@ -130,13 +125,17 @@ class PayoutManager extends AbstractEntityManager<Payout> {
                            .stream()
                            .toList();
         } else {
-            return byStripeAccount.getOrDefault(stripeAccount, new ArrayList<>());
+            Set<String> payoutIdsForStripeAccount = stripeAccountToPayoutId.getOrDefault(stripeAccount, new HashSet<>());
+            return entities.values()
+                           .stream()
+                           .filter(payout -> payoutIdsForStripeAccount.contains(payout.getId()))
+                           .toList();
         }
     }
 
     @Override
     public void clear() {
         super.clear();
-        byStripeAccount.clear();
+        stripeAccountToPayoutId.clear();
     }
 }

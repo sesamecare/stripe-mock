@@ -10,11 +10,8 @@ import java.util.Map;
 import java.util.Optional;
 
 class CustomerManager extends AbstractEntityManager<Customer> {
-    private final StripeEntities stripeEntities;
-
     protected CustomerManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, Customer.class, "cus", 14);
-        this.stripeEntities = stripeEntities;
+        super(stripeEntities, clock, Customer.class, "cus", 14);
     }
 
     @Override

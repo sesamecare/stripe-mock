@@ -13,11 +13,8 @@ import java.util.Map;
 import java.util.Objects;
 
 class RefundManager extends AbstractEntityManager<Refund> {
-    private final StripeEntities stripeEntities;
-
     protected RefundManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, Refund.class, "re", 24);
-        this.stripeEntities = stripeEntities;
+        super(stripeEntities, clock, Refund.class, "re", 24);
     }
 
     @Override
@@ -41,6 +38,7 @@ class RefundManager extends AbstractEntityManager<Refund> {
             charge.getRefunds()
                   .getData()
                   .add(refund);
+            stripeEntities.bindChildToParentCollection(Charge.class, charge.getId(), "getRefunds", refund.getId());
             if (refund.getAmount() == null) {
                 refund.setAmount(charge.getAmount());
                 charge.setAmountRefunded(charge.getAmount());

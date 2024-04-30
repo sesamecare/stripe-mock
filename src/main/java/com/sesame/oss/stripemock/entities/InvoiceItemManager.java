@@ -12,11 +12,8 @@ import java.util.Map;
 import java.util.Optional;
 
 class InvoiceItemManager extends AbstractEntityManager<InvoiceItem> {
-    private final StripeEntities stripeEntities;
-
     protected InvoiceItemManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, InvoiceItem.class, "ii", 24);
-        this.stripeEntities = stripeEntities;
+        super(stripeEntities, clock, InvoiceItem.class, "ii", 24);
     }
 
     @Override
@@ -29,6 +26,7 @@ class InvoiceItemManager extends AbstractEntityManager<InvoiceItem> {
             invoice.getLines()
                    .getData()
                    .add(convertToLineItem(invoiceItem));
+            stripeEntities.bindChildToParentCollection(Invoice.class, invoiceId, "getLines", invoiceItem.getId());
         }
         return super.initialize(invoiceItem, formData, stripeAccount);
     }

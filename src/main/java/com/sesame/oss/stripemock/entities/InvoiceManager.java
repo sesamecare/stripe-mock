@@ -14,11 +14,8 @@ import java.util.Map;
 import java.util.Optional;
 
 class InvoiceManager extends AbstractEntityManager<Invoice> {
-    private final StripeEntities stripeEntities;
-
     protected InvoiceManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, Invoice.class, "in", 24);
-        this.stripeEntities = stripeEntities;
+        super(stripeEntities, clock, Invoice.class, "in", 24);
     }
 
     @Override

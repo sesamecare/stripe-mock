@@ -13,11 +13,8 @@ import java.util.List;
 import java.util.Map;
 
 class TransferManager extends AbstractEntityManager<Transfer> {
-    private final StripeEntities stripeEntities;
-
     protected TransferManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, Transfer.class, "tr", 24);
-        this.stripeEntities = stripeEntities;
+        super(stripeEntities, clock, Transfer.class, "tr", 24);
     }
 
     @Override

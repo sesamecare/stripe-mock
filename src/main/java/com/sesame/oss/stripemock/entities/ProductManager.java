@@ -7,8 +7,8 @@ import java.time.Clock;
 import java.util.Optional;
 
 class ProductManager extends AbstractEntityManager<Product> {
-    protected ProductManager(Clock clock) {
-        super(clock, Product.class, "prod", 24);
+    protected ProductManager(Clock clock, StripeEntities stripeEntities) {
+        super(stripeEntities, clock, Product.class, "prod", 24);
     }
 
     @Override

@@ -10,11 +10,8 @@ import java.util.Map;
 import java.util.Objects;
 
 class PaymentIntentManager extends AbstractEntityManager<PaymentIntent> {
-    private final StripeEntities stripeEntities;
-
     PaymentIntentManager(Clock clock, StripeEntities stripeEntities) {
-        super(clock, PaymentIntent.class, "pi", 24);
-        this.stripeEntities = stripeEntities;
+        super(stripeEntities, clock, PaymentIntent.class, "pi", 24);
     }
 
     @Override
