@@ -6,7 +6,7 @@
 
 	<groupId>com.sesame.oss.stripemock</groupId>
 	<artifactId>stripe-mock</artifactId>
-	<version>0.4</version>
+	<version>0.5-SNAPSHOT</version>
 
 	<properties>
 		<maven.compiler.source>21</maven.compiler.source>
